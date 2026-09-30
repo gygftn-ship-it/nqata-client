@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'map.dart';
+import 'onboarding.dart';
 import 'tabs.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
@@ -30,6 +32,8 @@ class Store extends ChangeNotifier {
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
+  Set<String> favs = {}; // commerces favoris
+  bool onboarded = false;
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
@@ -54,9 +58,10 @@ class Store extends ChangeNotifier {
       final c = await sb.from('profiles').select('client_code').eq('id', uid).maybeSingle();
       code = (c?['client_code'] as String?) ?? '';
     } catch (_) {}
+    favs = (await _q(sb.from('favorites').select('shop_id').eq('client_id', uid))).map((r) => '${r['shop_id']}').toSet();
     final r = await Future.wait([
       _q(sb.from('balances').select('points, last_scan_at, shops(id, name, reward_threshold)').eq('client_id', uid)),
-      _q(sb.from('shops').select('id, name, category, address, hours, lat, lng').eq('status', 'active').order('name')),
+      _q(sb.from('shops').select('id, name, category, address, hours, lat, lng, reward_threshold').eq('status', 'active').order('name')),
       _q(sb.from('offers').select('title, shops(name)').order('created_at', ascending: false)),
       _q(sb.from('scans').select('points, created_at, undone_at, shops(name)').eq('client_id', uid).order('created_at', ascending: false).limit(10)),
       _q(sb.from('notifications').select('id, title, body, created_at, read_at').eq('user_id', uid).order('created_at', ascending: false).limit(50)),
@@ -70,6 +75,28 @@ class Store extends ChangeNotifier {
     notifyListeners();
     _subscribe();
     await refresh();
+  }
+
+  Future<void> toggleFav(String id) async {
+    final was = favs.contains(id);
+    was ? favs.remove(id) : favs.add(id);
+    notifyListeners();
+    try {
+      if (was) {
+        await sb.from('favorites').delete().eq('client_id', uid).eq('shop_id', id);
+      } else {
+        await sb.from('favorites').insert({'client_id': uid, 'shop_id': id});
+      }
+    } catch (_) {
+      was ? favs.add(id) : favs.remove(id);
+      notifyListeners();
+    }
+  }
+
+  void finishOnboarding() {
+    onboarded = true;
+    SharedPreferences.getInstance().then((p) => p.setBool('onboarded', true));
+    notifyListeners();
   }
 
   // Notifications reçues en direct (Supabase Realtime)
@@ -112,7 +139,7 @@ class Store extends ChangeNotifier {
   Future<void> signOut() async {
     try { await sb.auth.signOut(); } catch (_) {}
     if (_chan != null) { sb.removeChannel(_chan!); _chan = null; }
-    loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; incoming = null;
+    loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null;
     notifyListeners();
   }
 
@@ -138,7 +165,9 @@ final store = Store();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  lang = (await SharedPreferences.getInstance()).getString('lang') ?? 'fr';
+  final prefs = await SharedPreferences.getInstance();
+  lang = prefs.getString('lang') ?? 'fr';
+  store.onboarded = prefs.getBool('onboarded') ?? false;
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataClient());
@@ -163,7 +192,7 @@ class NqataClient extends StatelessWidget {
           darkTheme: _theme(Brightness.dark),
           themeMode: ThemeMode.system,
           builder: (c, child) => Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!),
-          home: store.loggedIn ? const Shell() : const LoginPage(),
+          home: !store.onboarded ? const OnboardingPage() : store.loggedIn ? const Shell() : const LoginPage(),
         ),
       );
 }
@@ -261,6 +290,7 @@ class _ShellState extends State<Shell> {
 
   // Bandeau affiché quand une notification arrive pendant que l'app est ouverte
   void _onStore() {
+    if (mounted) setState(() {});
     final n = store.incoming;
     if (n == null || !mounted) return;
     store.incoming = null;
