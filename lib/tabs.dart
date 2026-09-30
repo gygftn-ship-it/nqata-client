@@ -57,26 +57,44 @@ class HomeTab extends StatefulWidget {
   State<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> {
+class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   String token = '';
+  String? qrError;
   Timer? timer;
 
   Future<void> _token() async {
     try {
       final t = await store.sb.rpc('new_qr_token') as String;
-      if (mounted) setState(() => token = t);
-    } catch (_) {}
+      if (mounted) setState(() { token = t; qrError = null; });
+    } catch (e) {
+      if (mounted) setState(() { token = ''; qrError = errText(e); });
+    }
   }
 
-  @override
-  void initState() {
-    super.initState();
+  void _restart() {
+    timer?.cancel();
     _token();
     timer = Timer.periodic(const Duration(seconds: rotationSeconds), (_) { _token(); store.refresh(); });
   }
 
   @override
-  void dispose() { timer?.cancel(); super.dispose(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restart();
+  }
+
+  // Au retour dans l'app (écran verrouillé, autre app...), l'ancien QR est expiré : on en demande un neuf tout de suite.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _restart();
+      store.refresh();
+    }
+  }
+
+  @override
+  void dispose() { WidgetsBinding.instance.removeObserver(this); timer?.cancel(); super.dispose(); }
 
   String? _next() {
     String? best;
@@ -153,14 +171,28 @@ class _HomeTabState extends State<HomeTab> {
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 400),
-                        child: token.isEmpty
-                            ? const SizedBox(key: ValueKey('w'), width: 200, height: 200, child: Center(child: CircularProgressIndicator()))
-                            : QrImageView(key: ValueKey(token), data: token, size: 200),
+                        child: token.isNotEmpty
+                            ? QrImageView(key: ValueKey(token), data: token, size: 220)
+                            : qrError != null
+                                ? SizedBox(
+                                    key: const ValueKey('e'),
+                                    width: 220,
+                                    height: 220,
+                                    child: Center(
+                                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                        const Icon(Icons.qr_code_2, size: 48, color: Colors.grey),
+                                        const SizedBox(height: 8),
+                                        Text(qrError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontSize: 12)),
+                                        TextButton(onPressed: _restart, child: Text(tr('Réessayer', 'إعادة المحاولة'))),
+                                      ]),
+                                    ),
+                                  )
+                                : const SizedBox(key: ValueKey('w'), width: 220, height: 220, child: Center(child: CircularProgressIndicator())),
                       ),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
-                      width: 200,
+                      width: 220,
                       child: TweenAnimationBuilder<double>(
                         key: ValueKey(token),
                         tween: Tween(begin: 1, end: 0),
@@ -253,69 +285,7 @@ class _HomeTabState extends State<HomeTab> {
       );
 }
 
-// ---------- 2. Carte des commerces ----------
-class MapTab extends StatelessWidget {
-  const MapTab({super.key});
-
-  void _sheet(BuildContext context, Map<String, dynamic> s) {
-    final lat = (s['lat'] as num).toDouble(), lng = (s['lng'] as num).toDouble();
-    final pts = store.wallet.where((r) => (r['shops'] as Map?)?['id'] == s['id']).fold<int>(0, (a, r) => a + (r['points'] as int));
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${s['name']}', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Row(children: [const Icon(Icons.place, size: 18), const SizedBox(width: 6), Expanded(child: Text('${s['address'] ?? ''}'))]),
-          const SizedBox(height: 4),
-          Row(children: [const Icon(Icons.schedule, size: 18), const SizedBox(width: 6), Text('${s['hours'] ?? ''}')]),
-          const SizedBox(height: 8),
-          Text('$pts ${tr('points chez ce commerce', 'نقطة في هذا المتجر')}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            icon: const Icon(Icons.directions),
-            label: Text(tr('Itinéraire', 'الاتجاهات')),
-            onPressed: () => launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'), mode: LaunchMode.externalApplication),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (_, __) {
-          final placed = store.shops.where((s) => s['lat'] != null && s['lng'] != null).toList();
-          final center = placed.isEmpty
-              ? const LatLng(36.7538, 3.0588)
-              : LatLng(placed.map((s) => (s['lat'] as num).toDouble()).reduce((a, b) => a + b) / placed.length,
-                  placed.map((s) => (s['lng'] as num).toDouble()).reduce((a, b) => a + b) / placed.length);
-          return Stack(children: [
-            FlutterMap(
-              key: ValueKey(placed.length),
-              options: MapOptions(initialCenter: center, initialZoom: 13),
-              children: [
-                TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'dz.nqata.client'),
-                MarkerLayer(markers: [
-                  for (final s in placed)
-                    Marker(
-                      point: LatLng((s['lat'] as num).toDouble(), (s['lng'] as num).toDouble()),
-                      width: 44,
-                      height: 44,
-                      child: GestureDetector(onTap: () => _sheet(context, s), child: const Icon(Icons.location_on, color: brandDark, size: 44)),
-                    ),
-                ]),
-                const SimpleAttributionWidget(source: Text('© OpenStreetMap')),
-              ],
-            ),
-            if (placed.isEmpty)
-              Center(child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(tr('Aucun commerce placé sur la carte', 'لا توجد محلات على الخريطة'))))),
-          ]);
-        },
-      );
-}
+// ---------- 2. Carte : voir map.dart ----------
 
 // ---------- 3. Cartes de fidélité (style carte bancaire virtuelle) ----------
 class FlipCard extends StatefulWidget {
