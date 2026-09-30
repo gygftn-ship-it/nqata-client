@@ -2,10 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'extras.dart';
 import 'main.dart';
 
 // ---------- Utilitaires animés ----------
@@ -81,6 +80,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WakelockPlus.enable(); // l'écran reste allumé pendant que le commerçant scanne
     _restart();
   }
 
@@ -94,7 +94,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   }
 
   @override
-  void dispose() { WidgetsBinding.instance.removeObserver(this); timer?.cancel(); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); WakelockPlus.disable(); timer?.cancel(); super.dispose(); }
 
   String? _next() {
     String? best;
@@ -240,6 +240,26 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                   Expanded(child: _stat(context, Icons.credit_card_rounded, store.wallet.length, tr('Cartes', 'بطاقات'), onTap: () => widget.goTo(2))),
                 ]),
               ),
+              if (store.rewardsReady.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                FadeSlideIn(
+                  index: 3,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(16)),
+                    child: Row(children: [
+                      const Text('🎁', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${tr('Récompense disponible chez', 'مكافأة متاحة في')} ${store.rewardsReady.join(', ')}. ${tr('Montrez votre code au commerçant.', 'أظهر رمزك للتاجر.')}',
+                          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ],
               if (next != null) ...[
                 const SizedBox(height: 12),
                 FadeSlideIn(index: 3, child: Row(children: [const Icon(Icons.emoji_events_rounded, color: Colors.amber), const SizedBox(width: 8), Expanded(child: Text(next))])),
@@ -269,7 +289,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 ),
               ],
               const SizedBox(height: 20),
-              Text(tr('Activité récente', 'النشاط الأخير'), style: theme.textTheme.titleMedium),
+              Row(children: [
+                Expanded(child: Text(tr('Activité récente', 'النشاط الأخير'), style: theme.textTheme.titleMedium)),
+                TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
+              ]),
               if (acts.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(tr('Aucune visite pour le moment', 'لا زيارات حتى الآن'))),
               for (final a in acts)
                 ListTile(
@@ -553,6 +576,8 @@ class ProfileTab extends StatelessWidget {
               onSelectionChanged: (s) => store.setLang(s.first),
             ),
           ),
+          ListTile(leading: const Icon(Icons.history), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()))),
+          ListTile(leading: const Icon(Icons.help_outline), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
           ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: Text(tr('Confidentialité', 'الخصوصية')), onTap: () => _privacy(context)),
           const Divider(),
           ListTile(leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
