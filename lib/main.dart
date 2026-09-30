@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'extras.dart';
 import 'map.dart';
 import 'onboarding.dart';
 import 'tabs.dart';
@@ -34,12 +36,20 @@ class Store extends ChangeNotifier {
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
   bool onboarded = false;
+  bool offline = false; // dernière synchronisation échouée : on affiche les données gardées en mémoire
+  DateTime? lastSync;
+  String? celebrate; // commerce dont une récompense vient d'être débloquée
+  int _rewardCount = -1;
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
   String get email => sb.auth.currentUser?.email ?? '';
   int get total => wallet.fold(0, (s, r) => s + (r['points'] as int));
   int get unread => notifs.where((n) => n['read_at'] == null).length;
+  List<String> get rewardsReady => [
+        for (final r in wallet)
+          if ((r['points'] as int) >= (((r['shops'] as Map?)?['reward_threshold'] as int?) ?? 100)) '${(r['shops'] as Map?)?['name'] ?? ''}'
+      ];
 
   Future<List<Map<String, dynamic>>> _q(Future<dynamic> f) async {
     try {
@@ -53,7 +63,11 @@ class Store extends ChangeNotifier {
     try {
       final p = await sb.from('profiles').select('display_name').eq('id', uid).maybeSingle();
       name = (p?['display_name'] as String?) ?? '';
-    } catch (_) {}
+    } catch (_) {
+      offline = true;
+      notifyListeners();
+      return;
+    }
     try {
       final c = await sb.from('profiles').select('client_code').eq('id', uid).maybeSingle();
       code = (c?['client_code'] as String?) ?? '';
@@ -67,6 +81,10 @@ class Store extends ChangeNotifier {
       _q(sb.from('notifications').select('id, title, body, created_at, read_at').eq('user_id', uid).order('created_at', ascending: false).limit(50)),
     ]);
     wallet = r[0]; shops = r[1]; offers = r[2]; activity = r[3]; notifs = r[4];
+    offline = false;
+    lastSync = DateTime.now();
+    _checkRewards();
+    _saveCache();
     notifyListeners();
   }
 
@@ -74,7 +92,46 @@ class Store extends ChangeNotifier {
     loggedIn = true;
     notifyListeners();
     _subscribe();
+    await _loadCache();
     await refresh();
+  }
+
+  // Confettis quand le nombre de récompenses disponibles augmente
+  void _checkRewards() {
+    var n = 0;
+    String? who;
+    for (final r in wallet) {
+      final shop = r['shops'] as Map?;
+      final c = (r['points'] as int) ~/ (((shop?['reward_threshold']) as int?) ?? 100);
+      n += c;
+      if (c > 0) who = '${shop?['name'] ?? ''}';
+    }
+    if (_rewardCount >= 0 && n > _rewardCount) celebrate = who ?? '';
+    _rewardCount = n;
+  }
+
+  // Mode hors connexion : dernières données gardées sur le téléphone
+  Future<void> _saveCache() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString('cache_$uid', jsonEncode({'name': name, 'code': code, 'wallet': wallet, 'shops': shops, 'offers': offers, 'activity': activity, 'notifs': notifs, 'at': DateTime.now().toIso8601String()}));
+    } catch (_) {}
+  }
+
+  List<Map<String, dynamic>> _list(dynamic v) => [for (final e in (v as List? ?? [])) Map<String, dynamic>.from(e as Map)];
+
+  Future<void> _loadCache() async {
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString('cache_$uid');
+      if (raw == null) return;
+      final m = jsonDecode(raw) as Map<String, dynamic>;
+      name = m['name'] as String? ?? '';
+      code = m['code'] as String? ?? '';
+      wallet = _list(m['wallet']); shops = _list(m['shops']); offers = _list(m['offers']); activity = _list(m['activity']); notifs = _list(m['notifs']);
+      lastSync = DateTime.tryParse(m['at'] as String? ?? '');
+      _checkRewards();
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> toggleFav(String id) async {
@@ -139,7 +196,7 @@ class Store extends ChangeNotifier {
   Future<void> signOut() async {
     try { await sb.auth.signOut(); } catch (_) {}
     if (_chan != null) { sb.removeChannel(_chan!); _chan = null; }
-    loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null;
+    loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null; celebrate = null; offline = false; _rewardCount = -1;
     notifyListeners();
   }
 
@@ -291,6 +348,11 @@ class _ShellState extends State<Shell> {
   // Bandeau affiché quand une notification arrive pendant que l'app est ouverte
   void _onStore() {
     if (mounted) setState(() {});
+    final who = store.celebrate;
+    if (who != null && mounted) {
+      store.celebrate = null;
+      showConfetti(context, who);
+    }
     final n = store.incoming;
     if (n == null || !mounted) return;
     store.incoming = null;
@@ -319,9 +381,11 @@ class _ShellState extends State<Shell> {
           child: KeyedSubtree(key: ValueKey(tab), child: pages[tab]),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (store.offline) offlineBanner(),
+        NavigationBar(
         selectedIndex: tab,
-        onDestinationSelected: (i) => setState(() => tab = i),
+        onDestinationSelected: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
         destinations: [
           NavigationDestination(icon: const Icon(Icons.home_rounded), label: tr('Accueil', 'الرئيسية')),
           NavigationDestination(icon: const Icon(Icons.map_rounded), label: tr('Carte', 'الخريطة')),
@@ -329,7 +393,23 @@ class _ShellState extends State<Shell> {
           NavigationDestination(icon: const Icon(Icons.local_offer_rounded), label: tr('Offres', 'العروض')),
           NavigationDestination(icon: const Icon(Icons.person_rounded), label: tr('Profil', 'الملف')),
         ],
-      ),
+        ),
+      ]),
     );
   }
+}
+
+Widget offlineBanner() {
+  final d = store.lastSync?.toLocal();
+  final t = d == null ? '' : ' · ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  return Container(
+    width: double.infinity,
+    color: Colors.amber.shade700,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    child: Row(children: [
+      const Icon(Icons.wifi_off, size: 16, color: Colors.black87),
+      const SizedBox(width: 8),
+      Expanded(child: Text('${tr('Hors connexion : dernières données', 'بدون اتصال: آخر البيانات')}$t', style: const TextStyle(color: Colors.black87, fontSize: 12))),
+    ]),
+  );
 }
