@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +10,7 @@ import 'extras.dart';
 import 'map.dart';
 import 'onboarding.dart';
 import 'tabs.dart';
+import 'wallet.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
@@ -40,6 +43,12 @@ class Store extends ChangeNotifier {
   Map<String, Map<String, dynamic>> ratings = {}; // note moyenne par commerce
   Map<String, int> myRatings = {}; // mes notes
   bool onboarded = false;
+  // Code PIN du portefeuille (haché et salé, jamais stocké en clair)
+  String? pinHash, pinSalt;
+  bool unlocked = false;
+  int pinFails = 0;
+  DateTime? pinLockedUntil;
+  List<Map<String, dynamic>> txs = []; // transactions : visites et récompenses
   bool offline = false; // dernière synchronisation échouée : on affiche les données gardées en mémoire
   DateTime? lastSync;
   String? celebrate; // commerce dont une récompense vient d'être débloquée
@@ -49,6 +58,7 @@ class Store extends ChangeNotifier {
   String get uid => sb.auth.currentUser!.id;
   String get email => sb.auth.currentUser?.email ?? '';
   int get total => wallet.fold(0, (s, r) => s + (r['points'] as int));
+  bool get hasPin => pinHash != null;
   int get unread => notifs.where((n) => n['read_at'] == null).length;
   List<String> get rewardsReady => [
         for (final r in wallet)
@@ -79,6 +89,7 @@ class Store extends ChangeNotifier {
     favs = (await _q(sb.from('favorites').select('shop_id').eq('client_id', uid))).map((r) => '${r['shop_id']}').toSet();
     ratings = {for (final r in await _q(sb.from('shop_ratings').select('shop_id, avg_rating, reviews_count'))) '${r['shop_id']}': r};
     myRatings = {for (final r in await _q(sb.from('shop_reviews').select('shop_id, rating').eq('client_id', uid))) '${r['shop_id']}': r['rating'] as int};
+    txs = await _loadTxs();
     final r = await Future.wait([
       _q(sb.from('balances').select('points, last_scan_at, shops(id, name, reward_threshold)').eq('client_id', uid)),
       _q(sb.from('shops').select('id, name, category, address, hours, lat, lng, reward_threshold, description, logo_url, cover_url, cover_color').eq('status', 'active').order('name')),
@@ -120,7 +131,7 @@ class Store extends ChangeNotifier {
   Future<void> _saveCache() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString('cache_$uid', jsonEncode({'name': name, 'code': code, 'wallet': wallet, 'shops': shops, 'offers': offers, 'activity': activity, 'notifs': notifs, 'at': DateTime.now().toIso8601String()}));
+      await p.setString('cache_$uid', jsonEncode({'name': name, 'code': code, 'wallet': wallet, 'shops': shops, 'offers': offers, 'activity': activity, 'notifs': notifs, 'txs': txs, 'at': DateTime.now().toIso8601String()}));
     } catch (_) {}
   }
 
@@ -133,11 +144,73 @@ class Store extends ChangeNotifier {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       name = m['name'] as String? ?? '';
       code = m['code'] as String? ?? '';
-      wallet = _list(m['wallet']); shops = _list(m['shops']); offers = _list(m['offers']); activity = _list(m['activity']); notifs = _list(m['notifs']);
+      wallet = _list(m['wallet']); shops = _list(m['shops']); offers = _list(m['offers']); activity = _list(m['activity']); notifs = _list(m['notifs']); txs = _list(m['txs']);
       lastSync = DateTime.tryParse(m['at'] as String? ?? '');
       _checkRewards();
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<List<Map<String, dynamic>>> _loadTxs() async {
+    final sc = await _q(sb.from('scans').select('points, created_at, undone_at, shop_id, shops(name)').eq('client_id', uid).order('created_at', ascending: false).limit(100));
+    final rd = await _q(sb.from('redemptions').select('points_cost, created_at, shop_id, shops(name)').eq('client_id', uid).order('created_at', ascending: false).limit(100));
+    final all = <Map<String, dynamic>>[
+      for (final s in sc) {'type': 'visit', 'shop_id': s['shop_id'], 'shop': (s['shops'] as Map?)?['name'], 'amount': s['points'], 'at': s['created_at'], 'undone': s['undone_at'] != null},
+      for (final r in rd) {'type': 'reward', 'shop_id': r['shop_id'], 'shop': (r['shops'] as Map?)?['name'], 'amount': -(r['points_cost'] as int), 'at': r['created_at'], 'undone': false},
+    ];
+    all.sort((a, b) => '${b['at']}'.compareTo('${a['at']}'));
+    return all;
+  }
+
+  // ----- Code PIN -----
+  String _hash(String salt, String pin) => sha256.convert(utf8.encode('$salt:$pin')).toString();
+  bool checkPin(String pin) => pinHash != null && _hash(pinSalt!, pin) == pinHash;
+
+  Future<void> setPin(String pin) async {
+    final r = Random.secure();
+    pinSalt = List.generate(16, (_) => r.nextInt(16).toRadixString(16)).join();
+    pinHash = _hash(pinSalt!, pin);
+    unlocked = true;
+    pinFails = 0;
+    final p = await SharedPreferences.getInstance();
+    await p.setString('pin_salt', pinSalt!);
+    await p.setString('pin_hash', pinHash!);
+    notifyListeners();
+  }
+
+  Future<void> removePin() async {
+    pinHash = null;
+    pinSalt = null;
+    unlocked = false;
+    final p = await SharedPreferences.getInstance();
+    await p.remove('pin_salt');
+    await p.remove('pin_hash');
+    notifyListeners();
+  }
+
+  bool unlock(String pin) {
+    final until = pinLockedUntil;
+    if (until != null && DateTime.now().isBefore(until)) return false;
+    if (checkPin(pin)) {
+      unlocked = true;
+      pinFails = 0;
+      pinLockedUntil = null;
+      notifyListeners();
+      return true;
+    }
+    if (++pinFails >= 5) {
+      pinLockedUntil = DateTime.now().add(const Duration(seconds: 30));
+      pinFails = 0;
+    }
+    notifyListeners();
+    return false;
+  }
+
+  void lock() {
+    if (hasPin && unlocked) {
+      unlocked = false;
+      notifyListeners();
+    }
   }
 
   Future<void> rate(String shopId, int n) async {
@@ -208,6 +281,7 @@ class Store extends ChangeNotifier {
 
   Future<void> signOut() async {
     try { await sb.auth.signOut(); } catch (_) {}
+    await removePin();
     if (_chan != null) { sb.removeChannel(_chan!); _chan = null; }
     loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null; celebrate = null; offline = false; _rewardCount = -1;
     notifyListeners();
@@ -238,6 +312,8 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   lang = prefs.getString('lang') ?? 'fr';
   store.onboarded = prefs.getBool('onboarded') ?? false;
+  store.pinHash = prefs.getString('pin_hash');
+  store.pinSalt = prefs.getString('pin_salt');
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataClient());
@@ -346,17 +422,24 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
 
   @override
   void initState() {
     super.initState();
     store.addListener(_onStore);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
-  void dispose() { store.removeListener(_onStore); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); store.removeListener(_onStore); super.dispose(); }
+
+  // Le portefeuille se reverrouille quand l'app passe en arrière-plan
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.paused) store.lock();
+  }
 
   // Bandeau affiché quand une notification arrive pendant que l'app est ouverte
   void _onStore() {
@@ -385,7 +468,7 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [HomeTab(goTo: (i) => setState(() => tab = i)), const MapTab(), const CardsTab(), const DiscoverTab(), const ProfileTab()];
+    final pages = [HomeTab(goTo: (i) => setState(() => tab = i)), const MapTab(), const WalletTab(), const DiscoverTab(), const ProfileTab()];
     return Scaffold(
       body: SafeArea(
         child: AnimatedSwitcher(
@@ -398,7 +481,7 @@ class _ShellState extends State<Shell> {
         if (store.offline) offlineBanner(),
         NavigationBar(
         selectedIndex: tab,
-        onDestinationSelected: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
+        onDestinationSelected: (i) { HapticFeedback.selectionClick(); if (tab == 2 && i != 2) store.lock(); setState(() => tab = i); },
         destinations: [
           NavigationDestination(icon: const Icon(Icons.home_rounded), label: tr('Accueil', 'الرئيسية')),
           NavigationDestination(icon: const Icon(Icons.map_rounded), label: tr('Carte', 'الخريطة')),
