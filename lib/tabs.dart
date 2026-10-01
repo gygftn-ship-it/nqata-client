@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'extras.dart';
 import 'main.dart';
+import 'wallet.dart';
 
 // ---------- Utilitaires animés ----------
 class FadeSlideIn extends StatelessWidget {
@@ -578,6 +579,7 @@ class ProfileTab extends StatelessWidget {
           ),
           ListTile(leading: const Icon(Icons.history), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()))),
           ListTile(leading: const Icon(Icons.help_outline), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
+          const PinSettingsTile(),
           ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: Text(tr('Confidentialité', 'الخصوصية')), onTap: () => _privacy(context)),
           const Divider(),
           ListTile(leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
