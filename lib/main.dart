@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'discover.dart';
 import 'extras.dart';
 import 'map.dart';
 import 'onboarding.dart';
@@ -23,6 +24,7 @@ String errText(Object e) {
   if (m.contains('Invalid login credentials')) return tr('E-mail ou mot de passe incorrect', 'بريد أو كلمة سر خاطئة');
   if (m.contains('confirm_email')) return tr('Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول');
   if (m.contains('rate limit')) return tr('Trop d\'e-mails envoyés, réessayez plus tard', 'رسائل كثيرة، حاول لاحقًا');
+  if (m.contains('not_visited')) return tr('Visitez ce commerce avant de le noter', 'زر هذا المتجر قبل تقييمه');
   return tr('Erreur : $m', 'خطأ: $m');
 }
 
@@ -35,6 +37,8 @@ class Store extends ChangeNotifier {
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
+  Map<String, Map<String, dynamic>> ratings = {}; // note moyenne par commerce
+  Map<String, int> myRatings = {}; // mes notes
   bool onboarded = false;
   bool offline = false; // dernière synchronisation échouée : on affiche les données gardées en mémoire
   DateTime? lastSync;
@@ -73,10 +77,12 @@ class Store extends ChangeNotifier {
       code = (c?['client_code'] as String?) ?? '';
     } catch (_) {}
     favs = (await _q(sb.from('favorites').select('shop_id').eq('client_id', uid))).map((r) => '${r['shop_id']}').toSet();
+    ratings = {for (final r in await _q(sb.from('shop_ratings').select('shop_id, avg_rating, reviews_count'))) '${r['shop_id']}': r};
+    myRatings = {for (final r in await _q(sb.from('shop_reviews').select('shop_id, rating').eq('client_id', uid))) '${r['shop_id']}': r['rating'] as int};
     final r = await Future.wait([
       _q(sb.from('balances').select('points, last_scan_at, shops(id, name, reward_threshold)').eq('client_id', uid)),
-      _q(sb.from('shops').select('id, name, category, address, hours, lat, lng, reward_threshold').eq('status', 'active').order('name')),
-      _q(sb.from('offers').select('title, shops(name)').order('created_at', ascending: false)),
+      _q(sb.from('shops').select('id, name, category, address, hours, lat, lng, reward_threshold, description, logo_url, cover_url, cover_color').eq('status', 'active').order('name')),
+      _q(sb.from('offers').select('title, shop_id, shops(name)').order('created_at', ascending: false)),
       _q(sb.from('scans').select('points, created_at, undone_at, shops(name)').eq('client_id', uid).order('created_at', ascending: false).limit(10)),
       _q(sb.from('notifications').select('id, title, body, created_at, read_at').eq('user_id', uid).order('created_at', ascending: false).limit(50)),
     ]);
@@ -132,6 +138,13 @@ class Store extends ChangeNotifier {
       _checkRewards();
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<void> rate(String shopId, int n) async {
+    await sb.rpc('rate_shop', params: {'p_shop': shopId, 'p_rating': n});
+    myRatings[shopId] = n;
+    notifyListeners();
+    await refresh();
   }
 
   Future<void> toggleFav(String id) async {
@@ -372,7 +385,7 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [HomeTab(goTo: (i) => setState(() => tab = i)), const MapTab(), const CardsTab(), const OffersTab(), const ProfileTab()];
+    final pages = [HomeTab(goTo: (i) => setState(() => tab = i)), const MapTab(), const CardsTab(), const DiscoverTab(), const ProfileTab()];
     return Scaffold(
       body: SafeArea(
         child: AnimatedSwitcher(
