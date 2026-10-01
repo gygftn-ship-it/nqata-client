@@ -25,7 +25,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
 
   int _offers(Map<String, dynamic> s) => store.offers.where((o) => o['shop_id'] == s['id']).length;
   double _avg(Map<String, dynamic> s) => ((store.ratings['${s['id']}']?['avg_rating']) as num?)?.toDouble() ?? 0;
-  void _open(Map<String, dynamic> s) => Navigator.push(context, MaterialPageRoute(builder: (_) => ShopPage(shop: s)));
+  void _open(Map<String, dynamic> s) => Navigator.push(context, smoothRoute(ShopPage(shop: s)));
 
   List<Map<String, dynamic>> _filtered() {
     final list = store.shops.where((s) {
