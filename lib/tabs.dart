@@ -6,6 +6,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'extras.dart';
 import 'main.dart';
+import 'notifs.dart';
 import 'wallet.dart';
 
 // ---------- Utilitaires animés ----------
@@ -150,7 +151,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                   ),
                   IconButton(
                     icon: Badge(isLabelVisible: store.unread > 0, label: Text('${store.unread}'), child: const Icon(Icons.notifications_rounded, size: 28)),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
+                    onPressed: () => Navigator.push(context, smoothRoute(const NotificationsPage())),
                   ),
                 ]),
               ),
@@ -292,7 +293,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               const SizedBox(height: 20),
               Row(children: [
                 Expanded(child: Text(tr('Activité récente', 'النشاط الأخير'), style: theme.textTheme.titleMedium)),
-                TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
+                TextButton(onPressed: () => Navigator.push(context, smoothRoute(const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
               ]),
               if (acts.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(tr('Aucune visite pour le moment', 'لا زيارات حتى الآن'))),
               for (final a in acts)
@@ -577,8 +578,8 @@ class ProfileTab extends StatelessWidget {
               onSelectionChanged: (s) => store.setLang(s.first),
             ),
           ),
-          ListTile(leading: const Icon(Icons.history), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage()))),
-          ListTile(leading: const Icon(Icons.help_outline), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
+          ListTile(leading: const Icon(Icons.history), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+          ListTile(leading: const Icon(Icons.help_outline), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
           const PinSettingsTile(),
           ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: Text(tr('Confidentialité', 'الخصوصية')), onTap: () => _privacy(context)),
           const Divider(),
@@ -591,52 +592,5 @@ class ProfileTab extends StatelessWidget {
           const SizedBox(height: 16),
           const Center(child: Text('Nqata 0.1.0', style: TextStyle(color: Colors.grey))),
         ]),
-      );
-}
-
-// ---------- Centre de notifications ----------
-class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key});
-  @override
-  State<NotificationsPage> createState() => _NotificationsPageState();
-}
-
-class _NotificationsPageState extends State<NotificationsPage> {
-  late final Set<dynamic> fresh = store.notifs.where((n) => n['read_at'] == null).map((n) => n['id']).toSet();
-
-  @override
-  void initState() {
-    super.initState();
-    store.markAllRead(); // les nouvelles restent surlignées pendant cette visite
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tr('Notifications', 'الإشعارات'))),
-        body: ListenableBuilder(
-          listenable: store,
-          builder: (_, __) => RefreshIndicator(
-            onRefresh: store.refresh,
-            child: ListView(physics: const AlwaysScrollableScrollPhysics(), children: [
-              if (store.notifs.isEmpty) Padding(padding: const EdgeInsets.all(48), child: Center(child: Text(tr('Aucune notification pour le moment', 'لا توجد إشعارات حاليًا')))),
-              for (var i = 0; i < store.notifs.length; i++)
-                FadeSlideIn(
-                  index: i,
-                  child: Container(
-                    color: fresh.contains(store.notifs[i]['id']) ? brandLight.withOpacity(0.12) : null,
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: brandDark,
-                        child: Icon(('${store.notifs[i]['body']}').contains('offre') ? Icons.local_offer_rounded : Icons.stars_rounded, color: Colors.white, size: 20),
-                      ),
-                      title: Text('${store.notifs[i]['title']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${store.notifs[i]['body'] ?? ''}'),
-                      trailing: Text(fmtDate(store.notifs[i]['created_at'] as String?), style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-        ),
       );
 }
