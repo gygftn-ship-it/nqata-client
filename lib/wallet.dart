@@ -408,7 +408,7 @@ class _WalletTabState extends State<WalletTab> {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ShopPage(shop: shop!))),
+                onPressed: () => Navigator.push(context, smoothRoute(ShopPage(shop: shop!))),
                 child: Text('${tr('Voir le commerce', 'عرض المتجر')} →', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -495,7 +495,7 @@ class _WalletTabState extends State<WalletTab> {
                     const SizedBox(height: 10),
                     Row(children: [
                       Expanded(child: Text(page == 0 ? tr('Transactions', 'المعاملات') : '${tr('Transactions', 'المعاملات')} · ${(rows[page - 1]['shops'] as Map?)?['name'] ?? ''}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                      TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
+                      TextButton(onPressed: () => Navigator.push(context, smoothRoute(const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
                     ]),
                     Wrap(spacing: 8, children: [
                       for (final f in const [('all', 'Tout', 'الكل'), ('gain', 'Gains', 'الأرباح'), ('reward', 'Récompenses', 'المكافآت')])
