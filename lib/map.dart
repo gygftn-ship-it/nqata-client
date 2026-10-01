@@ -50,7 +50,7 @@ class _MapTabState extends State<MapTab> {
     }
   }
 
-  void _open(Map<String, dynamic> s) => Navigator.push(context, MaterialPageRoute(builder: (_) => ShopPage(shop: s, km: _km(s))));
+  void _open(Map<String, dynamic> s) => Navigator.push(context, smoothRoute(ShopPage(shop: s, km: _km(s))));
 
   void _list(List<Map<String, dynamic>> items) => showModalBottomSheet(
         context: context,
