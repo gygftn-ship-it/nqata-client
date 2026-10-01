@@ -10,14 +10,14 @@ import 'wallet.dart';
 
 const supportEmail = ''; // ← à renseigner : l'e-mail du support Nqata (le bouton « Contacter le support » l'utilisera)
 
-const _avatarColors = [Color(0xFF0E7C66), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
+const avatarColors = [Color(0xFF0E7C66), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
 
 void _snack(BuildContext c, String m) {
   if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
 }
 
 /// Niveau de fidélité selon le nombre de visites.
-Map<String, dynamic> _level() {
+Map<String, dynamic> levelInfo() {
   final v = store.txs.where((t) => t['type'] == 'visit' && t['undone'] != true).length;
   if (v >= 20) return {'emoji': '🥇', 'name': tr('Or', 'ذهبي'), 'from': 20, 'next': null, 'next_name': '', 'color': const Color(0xFFF59E0B), 'visits': v};
   if (v >= 5) return {'emoji': '🥈', 'name': tr('Argent', 'فضي'), 'from': 5, 'next': 20, 'next_name': tr('Or', 'الذهبي'), 'color': const Color(0xFF9CA3AF), 'visits': v};
@@ -45,14 +45,14 @@ class SettingsTab extends StatelessWidget {
             Text(tr('Couleur de l\'avatar', 'لون الصورة الرمزية')),
             const SizedBox(height: 10),
             Wrap(spacing: 10, runSpacing: 10, children: [
-              for (var i = 0; i < _avatarColors.length; i++)
+              for (var i = 0; i < avatarColors.length; i++)
                 GestureDetector(
                   onTap: () { HapticFeedback.selectionClick(); set(() => color = i); },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 42,
                     height: 42,
-                    decoration: BoxDecoration(color: _avatarColors[i], shape: BoxShape.circle, border: Border.all(color: color == i ? Colors.black87 : Colors.transparent, width: 3)),
+                    decoration: BoxDecoration(color: avatarColors[i], shape: BoxShape.circle, border: Border.all(color: color == i ? Colors.black87 : Colors.transparent, width: 3)),
                     child: color == i ? const Icon(Icons.check, color: Colors.white) : null,
                   ),
                 ),
@@ -152,7 +152,7 @@ class SettingsTab extends StatelessWidget {
       );
 
   Widget _header(BuildContext context) {
-    final lv = _level();
+    final lv = levelInfo();
     final next = lv['next'] as int?, from = lv['from'] as int, visits = lv['visits'] as int;
     final progress = next == null ? 1.0 : ((visits - from) / (next - from)).clamp(0.0, 1.0).toDouble();
     return Container(
@@ -177,7 +177,7 @@ class SettingsTab extends StatelessWidget {
             decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [Colors.white, lv['color'] as Color, Colors.white])),
             child: CircleAvatar(
               radius: 46,
-              backgroundColor: _avatarColors[store.avatarColor % _avatarColors.length],
+              backgroundColor: avatarColors[store.avatarColor % avatarColors.length],
               child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
             ),
           ),
