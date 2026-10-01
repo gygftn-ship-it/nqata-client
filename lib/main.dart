@@ -10,6 +10,10 @@ import 'extras.dart';
 import 'map.dart';
 import 'onboarding.dart';
 import 'tabs.dart';
+import 'home.dart';
+import 'nav.dart';
+import 'notifs.dart';
+import 'profile.dart';
 import 'wallet.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
@@ -43,6 +47,11 @@ class Store extends ChangeNotifier {
   Map<String, Map<String, dynamic>> ratings = {}; // note moyenne par commerce
   Map<String, int> myRatings = {}; // mes notes
   bool onboarded = false;
+  // Réglages
+  ThemeMode themeMode = ThemeMode.system;
+  double textScale = 1.0;
+  bool nPoints = true, nRewards = true, nOffers = true;
+  int avatarColor = 0;
   // Code PIN du portefeuille (haché et salé, jamais stocké en clair)
   String? pinHash, pinSalt;
   bool unlocked = false;
@@ -59,7 +68,18 @@ class Store extends ChangeNotifier {
   String get email => sb.auth.currentUser?.email ?? '';
   int get total => wallet.fold(0, (s, r) => s + (r['points'] as int));
   bool get hasPin => pinHash != null;
-  int get unread => notifs.where((n) => n['read_at'] == null).length;
+  int get unread => notifsShown.where((n) => n['read_at'] == null).length;
+
+  // Préférences de notification : on masque les catégories désactivées
+  bool notifAllowed(Map<String, dynamic> n) {
+    final b = '${n['body'] ?? ''}';
+    if (b.startsWith('+')) return nPoints;
+    if (b.contains('Récompense')) return nRewards;
+    if (b.toLowerCase().contains('offre')) return nOffers;
+    return true;
+  }
+
+  List<Map<String, dynamic>> get notifsShown => notifs.where(notifAllowed).toList();
   List<String> get rewardsReady => [
         for (final r in wallet)
           if ((r['points'] as int) >= (((r['shops'] as Map?)?['reward_threshold'] as int?) ?? 100)) '${(r['shops'] as Map?)?['name'] ?? ''}'
@@ -213,6 +233,39 @@ class Store extends ChangeNotifier {
     }
   }
 
+  Future<void> _save(String k, Object v) async {
+    final p = await SharedPreferences.getInstance();
+    if (v is bool) {
+      await p.setBool(k, v);
+    } else if (v is int) {
+      await p.setInt(k, v);
+    } else if (v is double) {
+      await p.setDouble(k, v);
+    } else if (v is String) {
+      await p.setString(k, v);
+    }
+  }
+
+  void setThemeMode(ThemeMode m) { themeMode = m; _save('theme', m.name); notifyListeners(); }
+  void setTextScale(double s) { textScale = s; _save('tscale', s); notifyListeners(); }
+  void setAvatarColor(int i) { avatarColor = i; _save('avatar', i); notifyListeners(); }
+  void setNotifPref(String k, bool v) {
+    if (k == 'points') nPoints = v;
+    if (k == 'rewards') nRewards = v;
+    if (k == 'offers') nOffers = v;
+    _save('n_$k', v);
+    notifyListeners();
+  }
+
+  Future<void> changePassword(String p) async {
+    await sb.auth.updateUser(UserAttributes(password: p));
+  }
+
+  Future<void> signOutEverywhere() async {
+    try { await sb.auth.signOut(scope: SignOutScope.global); } catch (_) {}
+    await signOut();
+  }
+
   Future<void> rate(String shopId, int n) async {
     await sb.rpc('rate_shop', params: {'p_shop': shopId, 'p_rating': n});
     myRatings[shopId] = n;
@@ -253,7 +306,7 @@ class Store extends ChangeNotifier {
           table: 'notifications',
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: uid),
           callback: (payload) {
-            incoming = payload.newRecord;
+            if (notifAllowed(payload.newRecord)) incoming = payload.newRecord;
             refresh();
           },
         )
@@ -314,6 +367,12 @@ Future<void> main() async {
   store.onboarded = prefs.getBool('onboarded') ?? false;
   store.pinHash = prefs.getString('pin_hash');
   store.pinSalt = prefs.getString('pin_salt');
+  store.themeMode = ThemeMode.values.firstWhere((m) => m.name == prefs.getString('theme'), orElse: () => ThemeMode.system);
+  store.textScale = prefs.getDouble('tscale') ?? 1.0;
+  store.nPoints = prefs.getBool('n_points') ?? true;
+  store.nRewards = prefs.getBool('n_rewards') ?? true;
+  store.nOffers = prefs.getBool('n_offers') ?? true;
+  store.avatarColor = prefs.getInt('avatar') ?? 0;
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataClient());
@@ -336,8 +395,9 @@ class NqataClient extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: _theme(Brightness.light),
           darkTheme: _theme(Brightness.dark),
-          themeMode: ThemeMode.system,
-          builder: (c, child) => Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!),
+          themeMode: store.themeMode,
+          scrollBehavior: const BouncyScroll(),
+          builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(textScaler: TextScaler.linear(store.textScale)), child: Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!)),
           home: !store.onboarded ? const OnboardingPage() : store.loggedIn ? const Shell() : const LoginPage(),
         ),
       );
@@ -462,33 +522,33 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           const SizedBox(width: 12),
           Expanded(child: Text('${n['title']} · ${n['body'] ?? ''}')),
         ]),
-        action: SnackBarAction(label: tr('Voir', 'عرض'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
+        action: SnackBarAction(label: tr('Voir', 'عرض'), onPressed: () => Navigator.push(context, smoothRoute(const NotificationsPage()))),
       ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [HomeTab(goTo: (i) => setState(() => tab = i)), const MapTab(), const WalletTab(), const DiscoverTab(), const ProfileTab()];
+    final pages = [HomeScreen(goTo: (i) => setState(() => tab = i)), const MapTab(), const WalletTab(), const DiscoverTab(), const SettingsTab()];
     return Scaffold(
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
-          transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
+          transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(a), child: child)),
           child: KeyedSubtree(key: ValueKey(tab), child: pages[tab]),
         ),
       ),
       bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
         if (store.offline) offlineBanner(),
-        NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i) { HapticFeedback.selectionClick(); if (tab == 2 && i != 2) store.lock(); setState(() => tab = i); },
-        destinations: [
-          NavigationDestination(icon: const Icon(Icons.home_rounded), label: tr('Accueil', 'الرئيسية')),
-          NavigationDestination(icon: const Icon(Icons.map_rounded), label: tr('Carte', 'الخريطة')),
-          NavigationDestination(icon: const Icon(Icons.credit_card_rounded), label: tr('Cartes', 'البطاقات')),
-          NavigationDestination(icon: const Icon(Icons.local_offer_rounded), label: tr('Offres', 'العروض')),
-          NavigationDestination(icon: const Icon(Icons.person_rounded), label: tr('Profil', 'الملف')),
-        ],
+        FloatingNav(
+          index: tab,
+          onTap: (i) { HapticFeedback.selectionClick(); if (tab == 2 && i != 2) store.lock(); setState(() => tab = i); },
+          items: [
+            (Icons.home_outlined, Icons.home_rounded, tr('Accueil', 'الرئيسية')),
+            (Icons.map_outlined, Icons.map_rounded, tr('Carte', 'الخريطة')),
+            (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, tr('Portefeuille', 'المحفظة')),
+            (Icons.local_offer_outlined, Icons.local_offer_rounded, tr('Offres', 'العروض')),
+            (Icons.person_outline, Icons.person_rounded, tr('Profil', 'الملف')),
+          ],
         ),
       ]),
     );
@@ -508,4 +568,22 @@ Widget offlineBanner() {
       Expanded(child: Text('${tr('Hors connexion : dernières données', 'بدون اتصال: آخر البيانات')}$t', style: const TextStyle(color: Colors.black87, fontSize: 12))),
     ]),
   );
+}
+
+/// Transition de page fluide : fondu + léger glissement vers le haut.
+PageRouteBuilder<T> smoothRoute<T>(Widget page) => PageRouteBuilder<T>(
+      transitionDuration: const Duration(milliseconds: 380),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (_, a, __, child) {
+        final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+        return FadeTransition(opacity: c, child: SlideTransition(position: Tween(begin: const Offset(0, 0.06), end: Offset.zero).animate(c), child: child));
+      },
+    );
+
+/// Défilement élastique sur tous les écrans.
+class BouncyScroll extends MaterialScrollBehavior {
+  const BouncyScroll();
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
 }
