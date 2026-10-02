@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'main.dart';
 import 'shop.dart';
 import 'tabs.dart';
@@ -15,12 +16,12 @@ class _DiscoverTabState extends State<DiscoverTab> {
   bool openOnly = false, favOnly = false;
 
   static const cats = [
-    ('promo', '🔥', 'Promos', 'عروض'),
-    ('cafe', '☕', 'Café', 'مقهى'),
-    ('food', '🥖', 'Alimentation', 'مواد غذائية'),
-    ('health', '💊', 'Santé', 'صحة'),
-    ('beauty', '💈', 'Beauté', 'تجميل'),
-    ('other', '🏪', 'Autres', 'أخرى'),
+    ('promo', 'tag', 'Promos', 'عروض'),
+    ('cafe', 'cafe', 'Café', 'مقهى'),
+    ('food', 'basket', 'Alimentation', 'مواد غذائية'),
+    ('health', 'medical', 'Santé', 'صحة'),
+    ('beauty', 'scissors', 'Beauté', 'تجميل'),
+    ('other', 'store', 'Autres', 'أخرى'),
   ];
 
   int _offers(Map<String, dynamic> s) => store.offers.where((o) => o['shop_id'] == s['id']).length;
@@ -65,7 +66,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: sel ? brandLight : Colors.transparent, width: 2),
             ),
-            child: Text(c.$2, style: const TextStyle(fontSize: 30)),
+            child: NIcon(c.$2, size: 32, color: Theme.of(context).colorScheme.onSurface),
           ),
           const SizedBox(height: 6),
           Text(tr(c.$3, c.$4), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.bold : FontWeight.w600)),
@@ -92,7 +93,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: const Color(0xFF14213D), borderRadius: BorderRadius.circular(20)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.lock, size: 14, color: Colors.white), const SizedBox(width: 4), Text(tr('Fermé', 'مغلق'), style: const TextStyle(color: Colors.white, fontSize: 12))]),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [const NIcon('lock', size: 14, color: Colors.white), const SizedBox(width: 4), Text(tr('Fermé', 'مغلق'), style: const TextStyle(color: Colors.white, fontSize: 12))]),
                 ),
               if (n > 0)
                 Positioned(
@@ -101,14 +102,14 @@ class _DiscoverTabState extends State<DiscoverTab> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(20)),
-                    child: Text('🔥 $n', style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [const NIcon('tag', size: 13, color: Colors.black87, accent: Colors.white), const SizedBox(width: 3), Text('$n', style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold))]),
                   ),
                 ),
             ]),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(child: Text('${s['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold))),
-              const Icon(Icons.star, size: 15, color: Colors.amber),
+              const NIcon('star_fill', size: 15, color: Colors.amber),
               const SizedBox(width: 2),
               Text(r == null ? tr('Nouveau', 'جديد') : (r['avg_rating'] as num).toStringAsFixed(1), style: const TextStyle(fontSize: 12)),
             ]),
@@ -138,7 +139,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
               const SizedBox(height: 12),
               TextField(
                 onChanged: (v) => setState(() => query = v),
-                decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: tr('Rechercher un commerce', 'ابحث عن محل'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                decoration: InputDecoration(prefixIcon: const NIcon('search'), hintText: tr('Rechercher un commerce', 'ابحث عن محل'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
               ),
               const SizedBox(height: 16),
               SizedBox(height: 92, child: ListView(scrollDirection: Axis.horizontal, children: [for (final c in cats) _catItem(c)])),
@@ -152,12 +153,12 @@ class _DiscoverTabState extends State<DiscoverTab> {
                       PopupMenuItem(value: 'rating', child: Text(tr('Mieux notés', 'الأعلى تقييمًا'))),
                       PopupMenuItem(value: 'name', child: Text(tr('Nom (A-Z)', 'الاسم'))),
                     ],
-                    child: Chip(label: Row(mainAxisSize: MainAxisSize.min, children: [Text(tr('Trier', 'ترتيب')), const Icon(Icons.arrow_drop_down)])),
+                    child: Chip(label: Row(mainAxisSize: MainAxisSize.min, children: [Text(tr('Trier', 'ترتيب')), const NIcon('drop')])),
                   ),
                   const SizedBox(width: 8),
                   FilterChip(label: Text(tr('Ouvert maintenant', 'مفتوح الآن')), selected: openOnly, onSelected: (v) => setState(() => openOnly = v)),
                   const SizedBox(width: 8),
-                  FilterChip(label: Text(tr('⭐ Favoris', '⭐ المفضلة')), selected: favOnly, onSelected: (v) => setState(() => favOnly = v)),
+                  FilterChip(label: Row(mainAxisSize: MainAxisSize.min, children: [const NIcon('star_fill', size: 16, color: Colors.black87), const SizedBox(width: 4), Text(tr('Favoris', 'المفضلة'))]), selected: favOnly, onSelected: (v) => setState(() => favOnly = v)),
                 ]),
               ),
               if (deals.isNotEmpty) ...[
