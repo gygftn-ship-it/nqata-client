@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'main.dart';
 import 'tabs.dart';
 
@@ -14,22 +15,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
   int page = 0;
 
   static const slides = [
-    (Icons.qr_code_2_rounded, 'Une seule carte pour tous vos commerces', 'بطاقة واحدة لكل محلاتك', 'Présentez votre QR et gagnez des points à chaque visite.', 'اعرض رمزك واكسب نقاطًا في كل زيارة.'),
-    (Icons.card_giftcard_rounded, 'Des récompenses qui vous attendent', 'مكافآت بانتظارك', 'Suivez vos points commerce par commerce et débloquez des cadeaux.', 'تابع نقاطك في كل متجر واكسب هدايا.'),
-    (Icons.map_rounded, 'Offres et commerces près de vous', 'عروض ومحلات قريبة منك', 'Trouvez les commerces partenaires et profitez des bons plans.', 'اكتشف المحلات الشريكة واستفد من العروض.'),
+    ('qr', 'Une seule carte pour tous vos commerces', 'بطاقة واحدة لكل محلاتك', 'Présentez votre QR et gagnez des points à chaque visite.', 'اعرض رمزك واكسب نقاطًا في كل زيارة.'),
+    ('gift', 'Des récompenses qui vous attendent', 'مكافآت بانتظارك', 'Suivez vos points commerce par commerce et débloquez des cadeaux.', 'تابع نقاطك في كل متجر واكسب هدايا.'),
+    ('pin', 'Offres et commerces près de vous', 'عروض ومحلات قريبة منك', 'Trouvez les commerces partenaires et profitez des bons plans.', 'اكتشف المحلات الشريكة واستفد من العروض.'),
   ];
 
   @override
   void dispose() { pc.dispose(); super.dispose(); }
 
-  Widget _slide((IconData, String, String, String, String) s) => Padding(
+  Widget _slide((String, String, String, String, String) s) => Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           FadeSlideIn(
             child: Container(
               padding: const EdgeInsets.all(32),
               decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
-              child: Icon(s.$1, size: 96, color: Colors.white),
+              child: NIcon(s.$1, size: 96, color: Colors.white),
             ),
           ),
           const SizedBox(height: 32),
