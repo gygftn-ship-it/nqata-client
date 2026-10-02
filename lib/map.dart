@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -7,7 +8,7 @@ import 'shop.dart';
 
 const _cats = {
   'all': ['Tous', 'الكل'],
-  'fav': ['⭐ Favoris', '⭐ المفضلة'],
+  'fav': ['Favoris', 'المفضلة'],
   'cafe': ['Café', 'مقهى'],
   'food': ['Alimentation', 'مواد غذائية'],
   'health': ['Santé', 'صحة'],
@@ -62,10 +63,10 @@ class _MapTabState extends State<MapTab> {
               : ListView(children: [
                   for (final s in items)
                     ListTile(
-                      leading: CircleAvatar(child: Icon(catIcon(s['category'] as String?))),
+                      leading: CircleAvatar(child: NIcon(catIcon(s['category'] as String?))),
                       title: Text('${s['name']}'),
                       subtitle: Text([if (_km(s) != null) '${_km(s)!.toStringAsFixed(1)} km', '${s['address'] ?? ''}'].join(' · ')),
-                      trailing: store.favs.contains('${s['id']}') ? const Icon(Icons.star, color: Colors.amber) : null,
+                      trailing: store.favs.contains('${s['id']}') ? const NIcon('star_fill', color: Colors.amber) : null,
                       onTap: () { Navigator.pop(context); _open(s); },
                     ),
                 ]),
@@ -103,7 +104,7 @@ class _MapTabState extends State<MapTab> {
                       height: 44,
                       child: GestureDetector(
                         onTap: () => _open(s),
-                        child: Icon(Icons.location_on, color: store.favs.contains('${s['id']}') ? Colors.amber.shade700 : brandDark, size: 44),
+                        child: NIcon('pin', color: store.favs.contains('${s['id']}') ? Colors.amber.shade700 : brandDark, size: 44),
                       ),
                     ),
                   if (me != null)
@@ -128,7 +129,7 @@ class _MapTabState extends State<MapTab> {
                   child: TextField(
                     onChanged: (v) => setState(() => query = v),
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: const NIcon('search'),
                       hintText: tr('Rechercher un commerce', 'ابحث عن محل'),
                       border: InputBorder.none,
                       filled: true,
@@ -154,9 +155,9 @@ class _MapTabState extends State<MapTab> {
               bottom: 16,
               end: 16,
               child: Column(children: [
-                FloatingActionButton.small(heroTag: 'loc', onPressed: _locate, child: const Icon(Icons.my_location)),
+                FloatingActionButton.small(heroTag: 'loc', onPressed: _locate, child: const NIcon('locate')),
                 const SizedBox(height: 10),
-                FloatingActionButton.extended(heroTag: 'lst', onPressed: () => _list(items), icon: const Icon(Icons.list), label: Text(tr('Liste', 'قائمة'))),
+                FloatingActionButton.extended(heroTag: 'lst', onPressed: () => _list(items), icon: const NIcon('list'), label: Text(tr('Liste', 'قائمة'))),
               ]),
             ),
             if (all.isEmpty) Center(child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(tr('Aucun commerce placé sur la carte', 'لا توجد محلات على الخريطة'))))),
