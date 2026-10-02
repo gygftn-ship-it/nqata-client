@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -8,11 +9,11 @@ import 'tabs.dart';
 
 // ---------- Catégories ----------
 const catInfo = {
-  'cafe': ('☕', 'Café', 'مقهى'),
-  'food': ('🥖', 'Alimentation', 'مواد غذائية'),
-  'health': ('💊', 'Santé', 'صحة'),
-  'beauty': ('💈', 'Beauté', 'تجميل'),
-  'other': ('🏪', 'Autres', 'أخرى'),
+  'cafe': ('cafe', 'Café', 'مقهى'),
+  'food': ('basket', 'Alimentation', 'مواد غذائية'),
+  'health': ('medical', 'Santé', 'صحة'),
+  'beauty': ('scissors', 'Beauté', 'تجميل'),
+  'other': ('store', 'Autres', 'أخرى'),
 };
 
 String catLabel(String? c) {
@@ -20,12 +21,12 @@ String catLabel(String? c) {
   return tr(i.$2, i.$3);
 }
 
-IconData catIcon(String? c) => switch (c) {
-      'cafe' => Icons.local_cafe_rounded,
-      'food' => Icons.shopping_basket_rounded,
-      'health' => Icons.medical_services_rounded,
-      'beauty' => Icons.content_cut_rounded,
-      _ => Icons.storefront_rounded,
+String catIcon(String? c) => switch (c) {
+      'cafe' => 'cafe',
+      'food' => 'basket',
+      'health' => 'medical',
+      'beauty' => 'scissors',
+      _ => 'store',
     };
 
 /// Ouvert maintenant ? (null si les horaires ne sont pas au format 08:00–20:00)
@@ -56,7 +57,7 @@ class ShopCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = hexColor(shop['cover_color'] as String?) ?? brandDark;
+    final base = hexColor(shop['cover_color'] as String?) ?? brandYellow;
     final grad = Container(
       height: height,
       width: double.infinity,
@@ -81,7 +82,7 @@ class ShopLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = shop['logo_url'] as String?;
-    final fallback = Center(child: Text((catInfo[shop['category']] ?? catInfo['other']!).$1, style: TextStyle(fontSize: size * 0.5)));
+    final fallback = Center(child: NIcon(catIcon(shop['category'] as String?), size: size * 0.5, color: const Color(0xFF15120B)));
     return Container(
       width: size,
       height: size,
@@ -106,18 +107,18 @@ class ShopPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Lien copié : collez-le dans WhatsApp ou un message', 'تم نسخ الرابط: الصقه في واتساب أو رسالة'))));
   }
 
-  Widget _circleBtn(IconData i, VoidCallback onTap, {Color color = Colors.white}) =>
-      Padding(padding: const EdgeInsets.only(left: 6), child: CircleAvatar(backgroundColor: Colors.black45, child: IconButton(icon: Icon(i, color: color), onPressed: onTap)));
+  Widget _circleBtn(String i, VoidCallback onTap, {Color color = Colors.white}) =>
+      Padding(padding: const EdgeInsets.only(left: 6), child: CircleAvatar(backgroundColor: Colors.black45, child: IconButton(icon: NIcon(i, color: color), onPressed: onTap)));
 
-  Widget _chip(String text, {Color? bg, Color fg = Colors.black87}) => Container(
+  Widget _chip(String text, {Color? bg, Color fg = Colors.black87, String? icon}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(color: bg ?? Colors.black12, borderRadius: BorderRadius.circular(20)),
-        child: Text(text, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [if (icon != null) ...[NIcon(icon, size: 15, color: fg), const SizedBox(width: 5)], Text(text, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600))]),
       );
 
-  Widget _row(IconData i, String t) => Padding(
+  Widget _row(String i, String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(i, size: 20, color: brandLight), const SizedBox(width: 10), Expanded(child: Text(t))]),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [NIcon(i, size: 20, color: brandLight), const SizedBox(width: 10), Expanded(child: Text(t))]),
       );
 
   @override
@@ -143,13 +144,13 @@ class ShopPage extends StatelessWidget {
             body: ListView(padding: EdgeInsets.zero, children: [
               Stack(clipBehavior: Clip.none, children: [
                 ShopCover(shop: s, height: 190 + top),
-                Positioned(top: top + 6, left: 8, child: _circleBtn(Icons.arrow_back, () => Navigator.pop(context))),
+                Positioned(top: top + 6, left: 8, child: _circleBtn('back', () => Navigator.pop(context))),
                 Positioned(
                   top: top + 6,
                   right: 8,
                   child: Row(children: [
-                    _circleBtn(fav ? Icons.star : Icons.star_border, () => store.toggleFav(id), color: Colors.amber),
-                    _circleBtn(Icons.share, () => _share(context, s)),
+                    _circleBtn(fav ? 'star_fill' : 'star', () => store.toggleFav(id), color: Colors.amber),
+                    _circleBtn('share', () => _share(context, s)),
                   ]),
                 ),
                 PositionedDirectional(bottom: -42, start: 20, child: ShopLogo(shop: s, size: 88)),
@@ -161,8 +162,8 @@ class ShopPage extends StatelessWidget {
                   Text('${s['name']}', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Wrap(spacing: 8, runSpacing: 6, children: [
-                    _chip(rating == null ? tr('⭐ Nouveau', '⭐ جديد') : '⭐ ${(rating['avg_rating'] as num).toStringAsFixed(1)} (${rating['reviews_count']})', bg: Colors.amber.shade100),
-                    _chip('${catInfo[s['category']]?.$1 ?? '🏪'} ${catLabel(s['category'] as String?)}'),
+                    _chip(rating == null ? tr('Nouveau', 'جديد') : '${(rating['avg_rating'] as num).toStringAsFixed(1)} (${rating['reviews_count']})', icon: 'star_fill', bg: Colors.amber.shade100),
+                    _chip(catLabel(s['category'] as String?), icon: catIcon(s['category'] as String?)),
                     if (open != null) _chip(open ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), bg: open ? Colors.green.shade100 : Colors.red.shade100),
                   ]),
                   if (desc.isNotEmpty) ...[const SizedBox(height: 14), Text(desc, style: theme.textTheme.bodyLarge)],
@@ -172,9 +173,9 @@ class ShopPage extends StatelessWidget {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
                       child: Column(children: [
-                        _row(Icons.schedule, '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
-                        _row(Icons.place, '${s['address'] ?? ''}'),
-                        if (km != null) _row(Icons.near_me, '${km!.toStringAsFixed(1)} km'),
+                        _row('history', '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
+                        _row('pin', '${s['address'] ?? ''}'),
+                        if (km != null) _row('near', '${km!.toStringAsFixed(1)} km'),
                       ]),
                     ),
                   ),
@@ -188,14 +189,14 @@ class ShopPage extends StatelessWidget {
                           options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: 15, interactionOptions: const InteractionOptions(flags: InteractiveFlag.none)),
                           children: [
                             TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'dz.nqata.client'),
-                            MarkerLayer(markers: [Marker(point: LatLng(lat, lng), width: 44, height: 44, child: const Icon(Icons.location_on, color: brandDark, size: 44))]),
+                            MarkerLayer(markers: [Marker(point: LatLng(lat, lng), width: 44, height: 44, child: const NIcon('pin', color: brandDark, size: 44))]),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
-                      icon: const Icon(Icons.directions),
+                      icon: const NIcon('directions'),
                       label: Text(tr('Itinéraire', 'الاتجاهات')),
                       onPressed: () => launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'), mode: LaunchMode.externalApplication),
                     ),
@@ -215,7 +216,7 @@ class ShopPage extends StatelessWidget {
                         const SizedBox(height: 8),
                         ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (pts % thr) / thr, minHeight: 8, backgroundColor: Colors.white24, color: Colors.white)),
                         const SizedBox(height: 6),
-                        Text(pts >= thr ? tr('🎁 Récompense disponible !', '🎁 مكافأة متاحة!') : tr('Encore ${thr - pts % thr} points avant une récompense', 'بقي ${thr - pts % thr} نقطة للمكافأة'), style: const TextStyle(color: Colors.white)),
+                        Text(pts >= thr ? tr('Récompense disponible !', 'مكافأة متاحة!') : tr('Encore ${thr - pts % thr} points avant une récompense', 'بقي ${thr - pts % thr} نقطة للمكافأة'), style: const TextStyle(color: Colors.white)),
                       ]),
                     ),
                   ),
@@ -230,7 +231,7 @@ class ShopPage extends StatelessWidget {
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), gradient: LinearGradient(colors: cardGrads[(i + 1) % 4])),
                         child: Row(children: [
-                          const Icon(Icons.local_offer_rounded, color: Colors.white),
+                          const NIcon('tag', color: Colors.white),
                           const SizedBox(width: 12),
                           Expanded(child: Text('${offers[i]['title']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                         ]),
@@ -252,12 +253,12 @@ class ShopPage extends StatelessWidget {
                                 }
                               }
                             : null,
-                        icon: Icon(i <= my ? Icons.star : Icons.star_border, color: Colors.amber, size: 36),
+                        icon: NIcon(i <= my ? 'star_fill' : 'star', color: Colors.amber, size: 36),
                       ),
                   ]),
                   if (!visited) Text(tr('Visitez ce commerce pour pouvoir le noter.', 'زر هذا المتجر لتتمكن من تقييمه.'), style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 18),
-                  FilledButton.icon(icon: const Icon(Icons.share), label: Text(tr('Copier le lien de partage', 'نسخ رابط المشاركة')), onPressed: () => _share(context, s)),
+                  FilledButton.icon(icon: const NIcon('share'), label: Text(tr('Copier le lien de partage', 'نسخ رابط المشاركة')), onPressed: () => _share(context, s)),
                   const SizedBox(height: 32),
                 ]),
               ),
