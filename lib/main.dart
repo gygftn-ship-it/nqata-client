@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,8 +20,9 @@ import 'wallet.dart';
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
 const supabaseKey = 'sb_publishable_-zL5W-Pf5WMHAZZCONw4_g_RNbjhE5g';
-const brandDark = Color(0xFF0B5F50);
-const brandLight = Color(0xFF14B8A6);
+const brandDark = Color(0xFF15120B); // noir chaud (encre)
+const brandLight = Color(0xFFC58B00); // or (accents, fin des dégradés)
+const brandYellow = Color(0xFFFFD60A); // le jaune de la direction artistique
 const rotationSeconds = 45;
 
 String lang = 'fr';
@@ -381,20 +383,14 @@ Future<void> main() async {
 class NqataClient extends StatelessWidget {
   const NqataClient({super.key});
 
-  ThemeData _theme(Brightness b) => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0E7C66), brightness: b),
-        navigationBarTheme: const NavigationBarThemeData(height: 68, indicatorShape: StadiumBorder()),
-      );
-
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) => MaterialApp(
           title: 'Nqata',
           debugShowCheckedModeBanner: false,
-          theme: _theme(Brightness.light),
-          darkTheme: _theme(Brightness.dark),
+          theme: buildTheme(Brightness.light),
+          darkTheme: buildTheme(Brightness.dark),
           themeMode: store.themeMode,
           scrollBehavior: const BouncyScroll(),
           builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(textScaler: TextScaler.linear(store.textScale)), child: Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!)),
@@ -436,18 +432,24 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandDark, brandLight])),
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Theme(
-                data: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0E7C66))),
+        backgroundColor: brandYellow,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Stack(children: [
+              SizedBox(height: 270, width: double.infinity, child: Image.asset('mascot_hero.jpg', fit: BoxFit.cover, alignment: const Alignment(0.3, -0.1))),
+              Padding(
+                padding: const EdgeInsets.only(top: 236),
                 child: Container(
+                  width: double.infinity,
+                  constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height - 280),
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Text('NQATA', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: 4, color: brandDark)),
+                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(32))),
+                  child: Column(children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Image.asset('coin.png', width: 36, height: 36),
+                      const SizedBox(width: 10),
+                      const Text('NQATA', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3)),
+                    ]),
                     const SizedBox(height: 16),
                     if (signup) _f(name, tr('Prénom ou pseudo', 'الاسم')),
                     _f(email, 'E-mail', type: TextInputType.emailAddress),
@@ -457,19 +459,14 @@ class _LoginPageState extends State<LoginPage> {
                       width: double.infinity,
                       child: FilledButton(
                         onPressed: busy ? null : _submit,
-                        child: busy
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
+                        child: busy ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => setState(() { signup = !signup; error = null; }),
-                      child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
-                    ),
+                    TextButton(onPressed: () => setState(() { signup = !signup; error = null; }), child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل'))),
                   ]),
                 ),
               ),
-            ),
+            ]),
           ),
         ),
       );
@@ -518,7 +515,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       ..showSnackBar(SnackBar(
         behavior: SnackBarBehavior.floating,
         content: Row(children: [
-          const Icon(Icons.notifications_active, color: Colors.white),
+          const NIcon('bell', color: Colors.white),
           const SizedBox(width: 12),
           Expanded(child: Text('${n['title']} · ${n['body'] ?? ''}')),
         ]),
@@ -543,11 +540,11 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           index: tab,
           onTap: (i) { HapticFeedback.selectionClick(); if (tab == 2 && i != 2) store.lock(); setState(() => tab = i); },
           items: [
-            (Icons.home_outlined, Icons.home_rounded, tr('Accueil', 'الرئيسية')),
-            (Icons.map_outlined, Icons.map_rounded, tr('Carte', 'الخريطة')),
-            (Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, tr('Portefeuille', 'المحفظة')),
-            (Icons.local_offer_outlined, Icons.local_offer_rounded, tr('Offres', 'العروض')),
-            (Icons.person_outline, Icons.person_rounded, tr('Profil', 'الملف')),
+            ('home', 'home', tr('Accueil', 'الرئيسية')),
+            ('pin', 'pin', tr('Carte', 'الخريطة')),
+            ('wallet', 'wallet', tr('Portefeuille', 'المحفظة')),
+            ('tag', 'tag', tr('Offres', 'العروض')),
+            ('user', 'user', tr('Profil', 'الملف')),
           ],
         ),
       ]),
@@ -563,7 +560,7 @@ Widget offlineBanner() {
     color: Colors.amber.shade700,
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
     child: Row(children: [
-      const Icon(Icons.wifi_off, size: 16, color: Colors.black87),
+      const NIcon('wifi_off', size: 16, color: Colors.black87),
       const SizedBox(width: 8),
       Expanded(child: Text('${tr('Hors connexion : dernières données', 'بدون اتصال: آخر البيانات')}$t', style: const TextStyle(color: Colors.black87, fontSize: 12))),
     ]),
@@ -586,4 +583,29 @@ class BouncyScroll extends MaterialScrollBehavior {
   const BouncyScroll();
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+}
+
+ThemeData buildTheme(Brightness b) {
+  final light = b == Brightness.light;
+  const ink = Color(0xFF15120B);
+  final cs = ColorScheme.fromSeed(seedColor: brandYellow, brightness: b).copyWith(
+    primary: brandYellow,
+    onPrimary: Colors.black,
+    secondaryContainer: brandYellow,
+    onSecondaryContainer: Colors.black,
+    surface: light ? const Color(0xFFFFFCF0) : const Color(0xFF0F0E0B),
+  );
+  final link = light ? ink : brandYellow;
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: cs,
+    scaffoldBackgroundColor: cs.surface,
+    appBarTheme: AppBarTheme(backgroundColor: cs.surface, surfaceTintColor: Colors.transparent, foregroundColor: light ? ink : Colors.white),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(backgroundColor: brandYellow, foregroundColor: Colors.black, shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14), textStyle: const TextStyle(fontWeight: FontWeight.w800))),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(foregroundColor: link, shape: const StadiumBorder(), side: BorderSide(color: link, width: 1.5))),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: link, textStyle: const TextStyle(fontWeight: FontWeight.w700))),
+    chipTheme: const ChipThemeData(shape: StadiumBorder(), showCheckmark: false),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: light ? ink : brandYellow),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(backgroundColor: brandYellow, foregroundColor: Colors.black),
+  );
 }
