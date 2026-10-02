@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'main.dart';
 import 'shop.dart';
 import 'tabs.dart';
@@ -28,11 +29,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return 'other';
   }
 
-  static (IconData, Color) _style(String k) => switch (k) {
-        'points' => (Icons.stars_rounded, Colors.green),
-        'rewards' => (Icons.card_giftcard_rounded, Colors.amber.shade700),
-        'offers' => (Icons.local_offer_rounded, Colors.pink),
-        _ => (Icons.notifications_rounded, Colors.blueGrey),
+  static (String, Color) _style(String k) => switch (k) {
+        'points' => ('coin', Colors.green),
+        'rewards' => ('gift', Colors.amber.shade700),
+        'offers' => ('tag', Colors.pink),
+        _ => ('bell', Colors.blueGrey),
       };
 
   static String _day(DateTime d) {
@@ -56,7 +57,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           return Scaffold(
             appBar: AppBar(
               title: Text(tr('Notifications', 'الإشعارات')),
-              actions: [IconButton(icon: const Icon(Icons.done_all), tooltip: tr('Tout marquer comme lu', 'تحديد الكل كمقروء'), onPressed: store.markAllRead)],
+              actions: [IconButton(icon: const NIcon('done_all'), tooltip: tr('Tout marquer comme lu', 'تحديد الكل كمقروء'), onPressed: store.markAllRead)],
             ),
             body: Column(children: [
               SizedBox(
@@ -82,7 +83,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             duration: const Duration(milliseconds: 900),
                             curve: Curves.elasticOut,
                             builder: (_, v, child) => Transform.scale(scale: v, child: child),
-                            child: const Icon(Icons.notifications_off_outlined, size: 72, color: Colors.grey),
+                            child: const RobotBadge(size: 130),
                           ),
                           const SizedBox(height: 12),
                           Text(tr('Rien pour le moment', 'لا شيء حاليًا'), style: theme.textTheme.titleMedium),
@@ -102,7 +103,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(color: fresh.contains(list[i]['id']) ? brandLight.withOpacity(0.14) : theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
                             child: Row(children: [
-                              CircleAvatar(backgroundColor: _style(_kind(list[i])).$2, child: Icon(_style(_kind(list[i])).$1, color: Colors.white, size: 22)),
+                              CircleAvatar(backgroundColor: _style(_kind(list[i])).$2, child: NIcon(_style(_kind(list[i])).$1, color: Colors.white, size: 22)),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
