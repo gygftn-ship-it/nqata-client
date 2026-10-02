@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -44,7 +45,7 @@ String fmtDate(String? iso) {
 }
 
 const cardGrads = [
-  [Color(0xFF0B5F50), Color(0xFF14B8A6)],
+  [Color(0xFF15120B), Color(0xFF8A6500)],
   [Color(0xFF3B0764), Color(0xFFEC4899)],
   [Color(0xFF7C2D12), Color(0xFFF59E0B)],
   [Color(0xFF0F172A), Color(0xFF3B82F6)],
@@ -111,14 +112,14 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     return best == null ? null : '$bestLeft ${tr('points avant une récompense chez', 'نقطة قبل مكافأة في')} $best';
   }
 
-  Widget _stat(BuildContext context, IconData icon, int value, String label, {VoidCallback? onTap}) => InkWell(
+  Widget _stat(BuildContext context, String icon, int value, String label, {VoidCallback? onTap}) => InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
           child: Row(children: [
-            Icon(icon, color: brandLight, size: 30),
+            NIcon(icon, color: brandLight, size: 30),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               AnimatedCount(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
@@ -150,7 +151,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                     ]),
                   ),
                   IconButton(
-                    icon: Badge(isLabelVisible: store.unread > 0, label: Text('${store.unread}'), child: const Icon(Icons.notifications_rounded, size: 28)),
+                    icon: Badge(isLabelVisible: store.unread > 0, label: Text('${store.unread}'), child: const NIcon('bell', size: 28)),
                     onPressed: () => Navigator.push(context, smoothRoute(const NotificationsPage())),
                   ),
                 ]),
@@ -182,7 +183,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                                     height: 220,
                                     child: Center(
                                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                                        const Icon(Icons.qr_code_2, size: 48, color: Colors.grey),
+                                        const NIcon('qr', size: 48, color: Colors.grey),
                                         const SizedBox(height: 8),
                                         Text(qrError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontSize: 12)),
                                         TextButton(onPressed: _restart, child: Text(tr('Réessayer', 'إعادة المحاولة'))),
@@ -223,7 +224,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                           Row(mainAxisSize: MainAxisSize.min, children: [
                             Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
                             const SizedBox(width: 8),
-                            const Icon(Icons.copy_rounded, color: Colors.white70, size: 18),
+                            const NIcon('copy', color: Colors.white70, size: 18),
                           ]),
                         ]),
                       ),
@@ -237,9 +238,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               FadeSlideIn(
                 index: 2,
                 child: Row(children: [
-                  Expanded(child: _stat(context, Icons.stars_rounded, store.total, tr('Points', 'نقاط'))),
+                  Expanded(child: _stat(context, 'coin', store.total, tr('Points', 'نقاط'))),
                   const SizedBox(width: 12),
-                  Expanded(child: _stat(context, Icons.credit_card_rounded, store.wallet.length, tr('Cartes', 'بطاقات'), onTap: () => widget.goTo(2))),
+                  Expanded(child: _stat(context, 'card', store.wallet.length, tr('Cartes', 'بطاقات'), onTap: () => widget.goTo(2))),
                 ]),
               ),
               if (store.rewardsReady.isNotEmpty) ...[
@@ -264,7 +265,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               ],
               if (next != null) ...[
                 const SizedBox(height: 12),
-                FadeSlideIn(index: 3, child: Row(children: [const Icon(Icons.emoji_events_rounded, color: Colors.amber), const SizedBox(width: 8), Expanded(child: Text(next))])),
+                FadeSlideIn(index: 3, child: Row(children: [const NIcon('trophy', color: Colors.amber), const SizedBox(width: 8), Expanded(child: Text(next))])),
               ],
               if (offer != null) ...[
                 const SizedBox(height: 16),
@@ -277,7 +278,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: LinearGradient(colors: cardGrads[2])),
                       child: Row(children: [
-                        const Icon(Icons.local_offer_rounded, color: Colors.white, size: 30),
+                        const NIcon('tag', color: Colors.white, size: 30),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -299,7 +300,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               for (final a in acts)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.check_circle, color: Colors.green),
+                  leading: const NIcon('check_circle', color: Colors.green),
                   title: Text('${(a['shops'] as Map?)?['name'] ?? ''}'),
                   subtitle: Text(fmtDate(a['created_at'] as String?)),
                   trailing: Text('+${a['points']}', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -373,7 +374,7 @@ class _LoyaltyCard extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Expanded(child: Text('${shop['name'] ?? ''}', style: white.copyWith(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                  const Icon(Icons.contactless_rounded, color: Colors.white),
+                  const NIcon('nfc', color: Colors.white),
                 ]),
                 if (pts >= thr)
                   Container(
@@ -443,7 +444,7 @@ class _CardsTabState extends State<CardsTab> {
               child: Padding(
                 padding: const EdgeInsets.all(32),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.credit_card_rounded, size: 64, color: brandLight),
+                  const NIcon('card', size: 64, color: brandLight),
                   const SizedBox(height: 12),
                   Text(tr('Aucune carte pour le moment', 'لا توجد بطاقات حاليًا'), style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
@@ -490,7 +491,7 @@ class OffersTab extends StatelessWidget {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: cardGrads[i % cardGrads.length])),
                   child: Row(children: [
-                    const Icon(Icons.local_offer_rounded, color: Colors.white, size: 36),
+                    const NIcon('tag', color: Colors.white, size: 36),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -568,9 +569,9 @@ class ProfileTab extends StatelessWidget {
           Center(child: Text(store.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
           Center(child: Text(store.email, style: const TextStyle(color: Colors.grey))),
           const SizedBox(height: 16),
-          ListTile(leading: const Icon(Icons.edit), title: Text(tr('Modifier mon nom', 'تعديل الاسم')), onTap: () => _rename(context)),
+          ListTile(leading: const NIcon('edit'), title: Text(tr('Modifier mon nom', 'تعديل الاسم')), onTap: () => _rename(context)),
           ListTile(
-            leading: const Icon(Icons.language),
+            leading: const NIcon('globe'),
             title: Text(tr('Langue', 'اللغة')),
             trailing: SegmentedButton<String>(
               segments: const [ButtonSegment(value: 'fr', label: Text('FR')), ButtonSegment(value: 'ar', label: Text('عربي'))],
@@ -578,14 +579,14 @@ class ProfileTab extends StatelessWidget {
               onSelectionChanged: (s) => store.setLang(s.first),
             ),
           ),
-          ListTile(leading: const Icon(Icons.history), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
-          ListTile(leading: const Icon(Icons.help_outline), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
+          ListTile(leading: const NIcon('history'), title: Text(tr('Historique', 'السجل')), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+          ListTile(leading: const NIcon('help'), title: Text(tr('Aide', 'المساعدة')), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
           const PinSettingsTile(),
-          ListTile(leading: const Icon(Icons.privacy_tip_outlined), title: Text(tr('Confidentialité', 'الخصوصية')), onTap: () => _privacy(context)),
+          ListTile(leading: const NIcon('shield'), title: Text(tr('Confidentialité', 'الخصوصية')), onTap: () => _privacy(context)),
           const Divider(),
-          ListTile(leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
+          ListTile(leading: const NIcon('logout'), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
           ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            leading: const NIcon('trash', color: Colors.red),
             title: Text(tr('Supprimer mon compte', 'حذف حسابي'), style: const TextStyle(color: Colors.red)),
             onTap: () => _delete(context),
           ),
