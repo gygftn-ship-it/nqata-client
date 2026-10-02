@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'extras.dart';
 import 'main.dart';
@@ -55,7 +56,7 @@ class _PinPadState extends State<PinPad> with SingleTickerProviderStateMixin {
           height: 62,
           alignment: Alignment.center,
           decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.surfaceContainerHighest),
-          child: label == '⌫' ? const Icon(Icons.backspace_outlined) : Text(label, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
+          child: label == '⌫' ? const NIcon('backspace') : Text(label, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600)),
         ),
       ),
     );
@@ -65,7 +66,7 @@ class _PinPadState extends State<PinPad> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) => Center(
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.lock_rounded, size: 44, color: brandLight),
+            const NIcon('lock', size: 44, color: brandLight),
             const SizedBox(height: 12),
             Text(widget.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             if (widget.subtitle != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(widget.subtitle!, style: const TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
@@ -141,7 +142,7 @@ class PinSettingsTile extends StatelessWidget {
       builder: (sheet) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
-            leading: const Icon(Icons.edit),
+            leading: const NIcon('edit'),
             title: Text(tr('Modifier le code PIN', 'تغيير رمز PIN')),
             onTap: () async {
               Navigator.pop(sheet);
@@ -149,7 +150,7 @@ class PinSettingsTile extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.lock_open, color: Colors.red),
+            leading: const NIcon('lock_open', color: Colors.red),
             title: Text(tr('Supprimer le code PIN', 'حذف رمز PIN'), style: const TextStyle(color: Colors.red)),
             onTap: () async {
               Navigator.pop(sheet);
@@ -165,7 +166,7 @@ class PinSettingsTile extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) => ListTile(
-          leading: const Icon(Icons.lock_outline),
+          leading: const NIcon('lock'),
           title: Text(tr('Code PIN du portefeuille', 'رمز PIN للمحفظة')),
           subtitle: Text(store.hasPin ? tr('Activé', 'مفعّل') : tr('Non défini', 'غير محدد')),
           onTap: () => _menu(context),
@@ -312,7 +313,7 @@ class _WalletTabState extends State<WalletTab> {
 
   // Carte Nqata permanente : toujours présente, même sans aucune visite
   Widget _member() {
-    final colors = [const Color(0xFF06201C), brandDark, brandLight];
+    final colors = [const Color(0xFF050505), brandDark, const Color(0xFF7A5A00)];
     final front = _shell(
       colors,
       Padding(
@@ -321,7 +322,7 @@ class _WalletTabState extends State<WalletTab> {
           Row(children: [
             Text('NQATA', style: _white.copyWith(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 4)),
             const Spacer(),
-            const Icon(Icons.contactless_rounded, color: Colors.white),
+            const NIcon('nfc', color: Colors.white),
           ]),
           const Spacer(),
           Text(store.name.isEmpty ? '…' : store.name.toUpperCase(), style: _white.copyWith(fontSize: 18, letterSpacing: 3), overflow: TextOverflow.ellipsis),
@@ -372,14 +373,14 @@ class _WalletTabState extends State<WalletTab> {
           Row(children: [
             if (shop != null) ...[ShopLogo(shop: shop, size: 38), const SizedBox(width: 10)],
             Expanded(child: Text('${info['name'] ?? ''}', style: _white.copyWith(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-            const Icon(Icons.contactless_rounded, color: Colors.white),
+            const NIcon('nfc', color: Colors.white),
           ]),
           if (pts >= thr)
             Container(
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(20)),
-              child: Text('🎁 ${pts ~/ thr} ${tr('récompense(s)', 'مكافأة')}', style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [const NIcon('gift', size: 14, color: Colors.black87, accent: Colors.white), const SizedBox(width: 4), Text('${pts ~/ thr} ${tr('récompense(s)', 'مكافأة')}', style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold))]),
             ),
           const Spacer(),
           AnimatedCount(pts, style: _white.copyWith(fontSize: 40, fontWeight: FontWeight.bold)),
@@ -423,7 +424,7 @@ class _WalletTabState extends State<WalletTab> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
         child: Row(children: [
-          const Icon(Icons.shield_outlined, color: brandLight),
+          const NIcon('shield', color: brandLight),
           const SizedBox(width: 12),
           Expanded(child: Text(tr('Protégez votre portefeuille avec un code PIN', 'احمِ محفظتك برمز PIN'))),
           TextButton(onPressed: () => setupPin(context), child: Text(tr('Activer', 'تفعيل'))),
@@ -445,7 +446,7 @@ class _WalletTabState extends State<WalletTab> {
           }).take(30).toList();
           DateTime at(int i) => DateTime.parse('${txs[i]['at']}').toLocal();
           return Container(
-            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brandDark.withOpacity(0.35), theme.colorScheme.surface], stops: const [0, 0.55])),
+            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brandYellow.withOpacity(0.3), theme.colorScheme.surface], stops: const [0, 0.55])),
             child: RefreshIndicator(
               onRefresh: store.refresh,
               child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.only(top: 16, bottom: 24), children: [
@@ -461,7 +462,7 @@ class _WalletTabState extends State<WalletTab> {
                         ]),
                       ]),
                     ),
-                    if (store.hasPin) IconButton(icon: const Icon(Icons.lock_outline), tooltip: tr('Verrouiller', 'قفل'), onPressed: store.lock),
+                    if (store.hasPin) IconButton(icon: const NIcon('lock'), tooltip: tr('Verrouiller', 'قفل'), onPressed: store.lock),
                   ]),
                 ),
                 const SizedBox(height: 8),
@@ -511,7 +512,7 @@ class _WalletTabState extends State<WalletTab> {
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
                             backgroundColor: txs[i]['type'] == 'reward' ? Colors.amber : (txs[i]['undone'] == true ? Colors.grey : Colors.green),
-                            child: Icon(txs[i]['type'] == 'reward' ? Icons.card_giftcard_rounded : (txs[i]['undone'] == true ? Icons.block : Icons.add), color: Colors.white),
+                            child: NIcon(txs[i]['type'] == 'reward' ? 'gift' : (txs[i]['undone'] == true ? 'block' : 'add'), color: Colors.white),
                           ),
                           title: Text('${txs[i]['shop'] ?? ''}'),
                           subtitle: Text(txs[i]['type'] == 'reward' ? tr('Récompense utilisée', 'مكافأة مستخدمة') : (txs[i]['undone'] == true ? tr('Annulé', 'ملغى') : tr('Visite', 'زيارة'))),
