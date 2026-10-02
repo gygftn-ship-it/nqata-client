@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
@@ -51,8 +52,8 @@ class _HistoryPageState extends State<HistoryPage> {
                   index: i,
                   child: ListTile(
                     leading: rows[i]['type'] == 'reward'
-                        ? const CircleAvatar(backgroundColor: Colors.amber, child: Icon(Icons.card_giftcard_rounded, color: Colors.black87))
-                        : CircleAvatar(backgroundColor: rows[i]['undone_at'] != null ? Colors.grey : Colors.green, child: const Icon(Icons.check, color: Colors.white)),
+                        ? const CircleAvatar(backgroundColor: Colors.amber, child: NIcon('gift', color: Colors.black87))
+                        : CircleAvatar(backgroundColor: rows[i]['undone_at'] != null ? Colors.grey : Colors.green, child: const NIcon('check', color: Colors.white)),
                     title: Text('${(rows[i]['shops'] as Map?)?['name'] ?? ''}'),
                     subtitle: Text(rows[i]['type'] == 'reward' ? tr('Récompense utilisée', 'مكافأة مستخدمة') : fmtDate(rows[i]['created_at'] as String?)),
                     trailing: rows[i]['type'] == 'reward'
@@ -136,7 +137,7 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
           child: ScaleTransition(
             scale: CurvedAnimation(parent: c, curve: const Interval(0, 0.3, curve: Curves.elasticOut)),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('🎁', style: TextStyle(fontSize: 72)),
+              const NIcon('gift', size: 88, color: Colors.white, accent: brandYellow),
               const SizedBox(height: 8),
               Text(tr('Récompense débloquée !', 'تم فتح مكافأة!'), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
               if (widget.shop.isNotEmpty) Text(widget.shop, style: const TextStyle(color: Colors.white70, fontSize: 18)),
