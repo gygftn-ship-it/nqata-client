@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -40,7 +41,7 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final r = Rect.fromLTWH(6, 6, size.width - 12, size.height - 12);
     final track = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..color = Colors.white24;
-    final arc = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.amber : Colors.white;
+    final arc = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.redAccent : brandYellow;
     canvas.drawArc(r, 0, 2 * pi, false, track);
     canvas.drawArc(r, -pi / 2, 2 * pi * t, false, arc);
   }
@@ -155,11 +156,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           valueListenable: tokenN,
           builder: (_, token, __) => Column(children: [
             Row(children: [
-              const Icon(Icons.qr_code_2_rounded, color: Colors.white),
+              Image.asset('coin.png', width: 28, height: 28),
               const SizedBox(width: 8),
               Text(tr('Mon QR personnel', 'رمزي الشخصي'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
               const Spacer(),
-              IconButton(icon: const Icon(Icons.refresh, color: Colors.white70), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
+              IconButton(icon: const NIcon('refresh', color: Colors.white70), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
             ]),
             const SizedBox(height: 4),
             GestureDetector(
@@ -188,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                                   width: 196,
                                   height: 196,
                                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                    const Icon(Icons.qr_code_2, size: 44, color: Colors.grey),
+                                    const NIcon('qr', size: 44, color: Colors.grey),
                                     const SizedBox(height: 6),
                                     Text(qrError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontSize: 12)),
                                     TextButton(onPressed: _restart, child: Text(tr('Réessayer', 'إعادة المحاولة'))),
@@ -217,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
                     const SizedBox(width: 8),
-                    const Icon(Icons.copy_rounded, color: Colors.white70, size: 18),
+                    const NIcon('copy', color: Colors.white70, size: 18),
                   ]),
                 ]),
               ),
@@ -226,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         ),
       );
 
-  Widget _action(IconData icon, String label, List<Color> colors, VoidCallback onTap) => Expanded(
+  Widget _action(String icon, String label, List<Color> colors, VoidCallback onTap) => Expanded(
         child: Pressable(
           onTap: onTap,
           child: Column(children: [
@@ -234,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               width: 58,
               height: 58,
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(colors: colors), boxShadow: [BoxShadow(color: colors.last.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))]),
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: NIcon(icon, color: Colors.white, size: 28),
             ),
             const SizedBox(height: 6),
             Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -284,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         child: AnimatedBuilder(
                           animation: bell,
                           builder: (_, child) => Transform.rotate(angle: store.unread > 0 && bell.value < 0.15 ? sin(bell.value / 0.15 * pi * 6) * 0.3 : 0, child: child),
-                          child: const Icon(Icons.notifications_rounded, size: 30),
+                          child: const NIcon('bell', size: 30),
                         ),
                       ),
                     ),
@@ -297,10 +298,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               FadeSlideIn(
                 index: 2,
                 child: Row(children: [
-                  _action(Icons.account_balance_wallet_rounded, tr('Portefeuille', 'المحفظة'), const [Color(0xFF0B5F50), Color(0xFF14B8A6)], () => widget.goTo(2)),
-                  _action(Icons.map_rounded, tr('Carte', 'الخريطة'), const [Color(0xFF1D4ED8), Color(0xFF60A5FA)], () => widget.goTo(1)),
-                  _action(Icons.local_offer_rounded, tr('Offres', 'العروض'), const [Color(0xFFBE185D), Color(0xFFF472B6)], () => widget.goTo(3)),
-                  _action(Icons.history_rounded, tr('Historique', 'السجل'), const [Color(0xFF7C3AED), Color(0xFFA78BFA)], () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+                  _action('wallet', tr('Portefeuille', 'المحفظة'), const [Color(0xFF0B5F50), Color(0xFF14B8A6)], () => widget.goTo(2)),
+                  _action('pin', tr('Carte', 'الخريطة'), const [Color(0xFF1D4ED8), Color(0xFF60A5FA)], () => widget.goTo(1)),
+                  _action('tag', tr('Offres', 'العروض'), const [Color(0xFFBE185D), Color(0xFFF472B6)], () => widget.goTo(3)),
+                  _action('history', tr('Historique', 'السجل'), const [Color(0xFF7C3AED), Color(0xFFA78BFA)], () => Navigator.push(context, smoothRoute(const HistoryPage()))),
                 ]),
               ),
               if (ready.isNotEmpty) ...[
@@ -313,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(colors: [Colors.amber.shade300, Colors.amber.shade600])),
                       child: Row(children: [
-                        AnimatedBuilder(animation: pulse, builder: (_, __) => Transform.scale(scale: 1 + 0.15 * pulse.value, child: const Text('🎁', style: TextStyle(fontSize: 32)))),
+                        AnimatedBuilder(animation: pulse, builder: (_, __) => Transform.scale(scale: 1 + 0.15 * pulse.value, child: const NIcon('gift', size: 36, color: Colors.black87, accent: Colors.white))),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -321,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                             Text('${ready.join(', ')} · ${tr('montrez votre code au commerçant', 'أظهر رمزك للتاجر')}', style: const TextStyle(color: Colors.black87, fontSize: 12)),
                           ]),
                         ),
-                        const Icon(Icons.chevron_right, color: Colors.black54),
+                        const NIcon('chevron', color: Colors.black54),
                       ]),
                     ),
                   ),
@@ -336,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Icon(Icons.stars_rounded, color: brandLight),
+                        const NIcon('coin', color: brandLight),
                         AnimatedCount(store.total, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
                         Text('${tr('points', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', style: const TextStyle(fontSize: 12)),
                       ]),
@@ -350,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('${lv['emoji']}', style: const TextStyle(fontSize: 26)),
+                          NIcon('trophy', size: 28, color: lv['color'] as Color),
                           Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 6),
                           TweenAnimationBuilder<double>(
@@ -393,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ],
               _title(tr('Mes favoris', 'مفضلتي')),
               if (favs.isEmpty)
-                Text(tr('Touchez ⭐ sur la fiche d\'un commerce pour le retrouver ici.', 'المس ⭐ في صفحة المتجر لتجده هنا.'), style: const TextStyle(color: Colors.grey))
+                Text(tr('Touchez l’étoile sur la fiche d’un commerce pour le retrouver ici.', 'المس النجمة في صفحة المتجر لتجده هنا.'), style: const TextStyle(color: Colors.grey))
               else
                 SizedBox(
                   height: 92,
@@ -419,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   index: i,
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(backgroundColor: acts[i]['type'] == 'reward' ? Colors.amber : Colors.green, child: Icon(acts[i]['type'] == 'reward' ? Icons.card_giftcard_rounded : Icons.add, color: Colors.white)),
+                    leading: CircleAvatar(backgroundColor: acts[i]['type'] == 'reward' ? Colors.amber : Colors.green, child: NIcon(acts[i]['type'] == 'reward' ? 'gift' : 'add', color: Colors.white)),
                     title: Text('${acts[i]['shop'] ?? ''}'),
                     subtitle: Text(fmtDate(acts[i]['at'] as String?)),
                     trailing: Text('${(acts[i]['amount'] as int) > 0 ? '+' : ''}${acts[i]['amount']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
