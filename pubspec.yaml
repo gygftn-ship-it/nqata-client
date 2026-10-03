@@ -16,6 +16,9 @@ dependencies:
   latlong2: ^0.9.1
   url_launcher: ^6.3.0
   geolocator: ^13.0.1
+  wakelock_plus: ^1.2.8
+  crypto: ^3.0.3
+  flutter_svg: ^2.0.10+1
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0
 
@@ -24,6 +27,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - mascot_hero.jpg
+    - coin.png
+    - robot.png
 
 flutter_launcher_icons:
   android: true
