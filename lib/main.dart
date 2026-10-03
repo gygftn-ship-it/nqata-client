@@ -14,6 +14,7 @@ import 'tabs.dart';
 import 'home.dart';
 import 'nav.dart';
 import 'notifs.dart';
+import 'push.dart';
 import 'profile.dart';
 import 'wallet.dart';
 
@@ -133,6 +134,7 @@ class Store extends ChangeNotifier {
     _subscribe();
     await _loadCache();
     await refresh();
+    Push.register(points: nPoints, rewards: nRewards, offers: nOffers); // notifications push (app fermée)
   }
 
   // Confettis quand le nombre de récompenses disponibles augmente
@@ -256,6 +258,7 @@ class Store extends ChangeNotifier {
     if (k == 'rewards') nRewards = v;
     if (k == 'offers') nOffers = v;
     _save('n_$k', v);
+    Push.syncPrefs(points: nPoints, rewards: nRewards, offers: nOffers);
     notifyListeners();
   }
 
@@ -264,6 +267,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> signOutEverywhere() async {
+    await Push.unregister();
     try { await sb.auth.signOut(scope: SignOutScope.global); } catch (_) {}
     await signOut();
   }
@@ -335,6 +339,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await Push.unregister(); // avant la déconnexion, pour ne plus recevoir les push de ce compte
     try { await sb.auth.signOut(); } catch (_) {}
     await removePin();
     if (_chan != null) { sb.removeChannel(_chan!); _chan = null; }
@@ -376,6 +381,7 @@ Future<void> main() async {
   store.nOffers = prefs.getBool('n_offers') ?? true;
   store.avatarColor = prefs.getInt('avatar') ?? 0;
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await Push.init();
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataClient());
 }
