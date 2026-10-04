@@ -53,6 +53,7 @@ const _icons = <String, String>{
   'cafe': r'<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c-.8 1 .8 1.7 0 2.8M12 3.5c-.8 1 .8 1.7 0 2.8"/><circle cx="10.5" cy="13.5" r="1.4" fill="{A}" stroke="none"/>',
   'medical': r'<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v5M9.5 13h5"/><circle cx="12" cy="13" r="1.3" fill="{A}" stroke="none"/>',
   'scissors': r'<circle cx="6.5" cy="6.5" r="2.5" fill="{A}"/><circle cx="6.5" cy="17.5" r="2.5"/><path d="M8.7 7.8 20 18M8.7 16.2 20 6"/>',
+  'fingerprint': r'<path d="M12 11v3.5c0 2-.5 3.8-1.6 5.5M8 8.5A5 5 0 0 1 17 11v2.5c0 1.6-.2 3-.7 4.4M5.5 12c0-.7.1-1.4.3-2M9 14.5c0 1.6-.3 2.9-.9 4M15 15c0 1.5-.2 2.6-.5 3.5"/><circle cx="12" cy="11" r="1.4" fill="{A}" stroke="none"/>',
   'chevron': r'<path d="M9.5 6l6 6-6 6"/>',
   'back': r'<path d="M19 12H5M11 6l-6 6 6 6"/>',
   'drop': r'<path d="M7 10l5 5 5-5"/>',
