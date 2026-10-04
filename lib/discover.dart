@@ -15,6 +15,12 @@ class _DiscoverTabState extends State<DiscoverTab> {
   String cat = 'all', sort = 'relevance', query = '';
   bool openOnly = false, favOnly = false;
 
+  @override
+  void initState() {
+    super.initState();
+    store.locate(); // sans demande : n'agit que si la localisation est déjà autorisée
+  }
+
   static const cats = [
     ('promo', 'tag', 'Promos', 'عروض'),
     ('cafe', 'cafe', 'Café', 'مقهى'),
@@ -38,6 +44,13 @@ class _DiscoverTabState extends State<DiscoverTab> {
       return true;
     }).toList();
     list.sort((a, b) {
+      if (sort == 'near') {
+        final ka = store.km(a), kb = store.km(b);
+        if (ka == null && kb == null) return 0;
+        if (ka == null) return 1;
+        if (kb == null) return -1;
+        return ka.compareTo(kb);
+      }
       if (sort == 'rating') return _avg(b).compareTo(_avg(a));
       if (sort == 'name') return '${a['name']}'.compareTo('${b['name']}');
       final fa = store.favs.contains('${a['id']}') ? 1 : 0, fb = store.favs.contains('${b['id']}') ? 1 : 0;
@@ -114,7 +127,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
               Text(r == null ? tr('Nouveau', 'جديد') : (r['avg_rating'] as num).toStringAsFixed(1), style: const TextStyle(fontSize: 12)),
             ]),
             Text(
-              '${catLabel(s['category'] as String?)} · ${n > 0 ? tr('$n offre(s)', '$n عرض') : '${s['hours'] ?? ''}'}',
+              '${catLabel(s['category'] as String?)} · ${n > 0 ? tr('$n offre(s)', '$n عرض') : '${s['hours'] ?? ''}'}${store.km(s) == null ? '' : ' · ${store.km(s)!.toStringAsFixed(1)} km'}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -147,9 +160,10 @@ class _DiscoverTabState extends State<DiscoverTab> {
                 height: 44,
                 child: ListView(scrollDirection: Axis.horizontal, children: [
                   PopupMenuButton<String>(
-                    onSelected: (v) => setState(() => sort = v),
+                    onSelected: (v) { setState(() => sort = v); if (v == 'near') store.locate(ask: true); },
                     itemBuilder: (_) => [
                       PopupMenuItem(value: 'relevance', child: Text(tr('Pertinence', 'الأهمية'))),
+                      PopupMenuItem(value: 'near', child: Text(tr('Plus proches', 'الأقرب'))),
                       PopupMenuItem(value: 'rating', child: Text(tr('Mieux notés', 'الأعلى تقييمًا'))),
                       PopupMenuItem(value: 'name', child: Text(tr('Nom (A-Z)', 'الاسم'))),
                     ],
