@@ -19,6 +19,7 @@ dependencies:
   wakelock_plus: ^1.2.8
   crypto: ^3.0.3
   flutter_svg: ^2.0.10+1
+  local_auth: ^2.3.0
   firebase_core: ^4.0.0
   firebase_messaging: ^16.0.0
 
