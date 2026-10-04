@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:local_auth/local_auth.dart';
 import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +18,7 @@ import 'home.dart';
 import 'nav.dart';
 import 'notifs.dart';
 import 'push.dart';
+import 'policy.dart';
 import 'profile.dart';
 import 'wallet.dart';
 
@@ -35,6 +39,7 @@ String errText(Object e) {
   if (m.contains('confirm_email')) return tr('Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول');
   if (m.contains('rate limit')) return tr('Trop d\'e-mails envoyés, réessayez plus tard', 'رسائل كثيرة، حاول لاحقًا');
   if (m.contains('not_visited')) return tr('Visitez ce commerce avant de le noter', 'زر هذا المتجر قبل تقييمه');
+  if (m.contains('bio_unavailable')) return tr('Aucune empreinte enregistrée sur ce téléphone : ajoutez-en une dans ses réglages', 'لا توجد بصمة مسجلة على هذا الهاتف: أضف واحدة من الإعدادات');
   return tr('Erreur : $m', 'خطأ: $m');
 }
 
@@ -55,6 +60,8 @@ class Store extends ChangeNotifier {
   double textScale = 1.0;
   bool nPoints = true, nRewards = true, nOffers = true;
   int avatarColor = 0;
+  bool bioEnabled = false; // déverrouillage du portefeuille par empreinte
+  LatLng? me; // position de l'utilisateur (jamais envoyée au serveur)
   // Code PIN du portefeuille (haché et salé, jamais stocké en clair)
   String? pinHash, pinSalt;
   bool unlocked = false;
@@ -209,6 +216,8 @@ class Store extends ChangeNotifier {
     final p = await SharedPreferences.getInstance();
     await p.remove('pin_salt');
     await p.remove('pin_hash');
+    await p.setBool('bio', false);
+    bioEnabled = false;
     notifyListeners();
   }
 
@@ -270,6 +279,68 @@ class Store extends ChangeNotifier {
     await Push.unregister();
     try { await sb.auth.signOut(scope: SignOutScope.global); } catch (_) {}
     await signOut();
+  }
+
+  // ----- Empreinte digitale -----
+  final _localAuth = LocalAuthentication();
+
+  Future<bool> bioAvailable() async {
+    try {
+      return await _localAuth.canCheckBiometrics && (await _localAuth.getAvailableBiometrics()).isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _bioPrompt() async {
+    try {
+      return await _localAuth.authenticate(
+        localizedReason: tr('Déverrouillez votre portefeuille Nqata', 'افتح محفظة نقطة'),
+        options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> unlockBio() async {
+    if (!hasPin || !bioEnabled) return false;
+    final ok = await _bioPrompt();
+    if (ok) {
+      unlocked = true;
+      pinFails = 0;
+      pinLockedUntil = null;
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  Future<void> setBio(bool v) async {
+    if (v) {
+      if (!await bioAvailable()) throw 'bio_unavailable';
+      if (!await _bioPrompt()) return;
+    }
+    bioEnabled = v;
+    _save('bio', v);
+    notifyListeners();
+  }
+
+  // ----- Position et distances -----
+  Future<void> locate({bool ask = false}) async {
+    try {
+      var p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied && ask) p = await Geolocator.requestPermission();
+      if (p == LocationPermission.denied || p == LocationPermission.deniedForever) return;
+      final pos = await Geolocator.getCurrentPosition();
+      me = LatLng(pos.latitude, pos.longitude);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  double? km(Map<String, dynamic> s) {
+    final lat = (s['lat'] as num?)?.toDouble(), lng = (s['lng'] as num?)?.toDouble();
+    if (me == null || lat == null || lng == null) return null;
+    return const Distance().distance(me!, LatLng(lat, lng)) / 1000;
   }
 
   Future<void> rate(String shopId, int n) async {
@@ -380,6 +451,7 @@ Future<void> main() async {
   store.nRewards = prefs.getBool('n_rewards') ?? true;
   store.nOffers = prefs.getBool('n_offers') ?? true;
   store.avatarColor = prefs.getInt('avatar') ?? 0;
+  store.bioEnabled = prefs.getBool('bio') ?? false;
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await Push.init();
   if (Supabase.instance.client.auth.currentSession != null) store.start();
@@ -469,6 +541,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     TextButton(onPressed: () => setState(() { signup = !signup; error = null; }), child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل'))),
+                    TextButton(onPressed: () => Navigator.push(context, smoothRoute(const PolicyPage())), child: Text(tr('Politique de confidentialité', 'سياسة الخصوصية'), style: const TextStyle(fontSize: 12))),
                   ]),
                 ),
               ),
