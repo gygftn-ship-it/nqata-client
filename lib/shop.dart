@@ -175,7 +175,7 @@ class ShopPage extends StatelessWidget {
                       child: Column(children: [
                         _row('history', '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
                         _row('pin', '${s['address'] ?? ''}'),
-                        if (km != null) _row('near', '${km!.toStringAsFixed(1)} km'),
+                        if ((km ?? store.km(s)) != null) _row('near', '${(km ?? store.km(s))!.toStringAsFixed(1)} km'),
                       ]),
                     ),
                   ),
