@@ -174,21 +174,41 @@ class PinSettingsTile extends StatelessWidget {
       );
 }
 
-class LockView extends StatelessWidget {
+class LockView extends StatefulWidget {
   const LockView({super.key});
   @override
-  Widget build(BuildContext context) => PinPad(
-        title: tr('Portefeuille verrouillé', 'المحفظة مقفلة'),
-        subtitle: tr('Entrez votre code PIN', 'أدخل رمز PIN'),
-        onComplete: (pin) async {
-          final until = store.pinLockedUntil;
-          if (until != null && DateTime.now().isBefore(until)) {
-            return tr('Trop d\'essais : réessayez dans ${until.difference(DateTime.now()).inSeconds + 1} s', 'محاولات كثيرة: أعد المحاولة بعد ${until.difference(DateTime.now()).inSeconds + 1} ثانية');
-          }
-          if (store.unlock(pin)) return null;
-          return store.pinLockedUntil != null ? tr('Trop d\'essais : réessayez dans 30 s', 'محاولات كثيرة: أعد المحاولة بعد 30 ثانية') : tr('Code incorrect', 'رمز خاطئ');
-        },
-      );
+  State<LockView> createState() => _LockViewState();
+}
+
+class _LockViewState extends State<LockView> {
+  @override
+  void initState() {
+    super.initState();
+    if (store.bioEnabled) WidgetsBinding.instance.addPostFrameCallback((_) => store.unlockBio());
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(children: [
+        PinPad(
+          title: tr('Portefeuille verrouillé', 'المحفظة مقفلة'),
+          subtitle: tr('Entrez votre code PIN', 'أدخل رمز PIN'),
+          onComplete: (pin) async {
+            final until = store.pinLockedUntil;
+            if (until != null && DateTime.now().isBefore(until)) {
+              return tr('Trop d\'essais : réessayez dans ${until.difference(DateTime.now()).inSeconds + 1} s', 'محاولات كثيرة: أعد المحاولة بعد ${until.difference(DateTime.now()).inSeconds + 1} ثانية');
+            }
+            if (store.unlock(pin)) return null;
+            return store.pinLockedUntil != null ? tr('Trop d\'essais : réessayez dans 30 s', 'محاولات كثيرة: أعد المحاولة بعد 30 ثانية') : tr('Code incorrect', 'رمز خاطئ');
+          },
+        ),
+        if (store.bioEnabled)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: Center(child: TextButton.icon(onPressed: store.unlockBio, icon: const NIcon('fingerprint', size: 22), label: Text(tr('Utiliser l\'empreinte', 'استخدام البصمة')))),
+          ),
+      ]);
 }
 
 // ======================= Effets visuels =======================
