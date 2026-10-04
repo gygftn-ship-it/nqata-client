@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'extras.dart';
 import 'main.dart';
+import 'policy.dart';
 import 'tabs.dart';
 import 'wallet.dart';
 
@@ -275,6 +276,14 @@ class SettingsTab extends StatelessWidget {
           ]),
           _section(context, 1, tr('Sécurité', 'الأمان'), [
             const PinSettingsTile(),
+            if (store.hasPin)
+              _switch('fingerprint', Colors.teal, tr('Déverrouiller avec l\'empreinte', 'الفتح بالبصمة'), tr('Au lieu de saisir le code PIN', 'بدل إدخال رمز PIN'), store.bioEnabled, (v) async {
+                try {
+                  await store.setBio(v);
+                } catch (e) {
+                  _snack(context, errText(e));
+                }
+              }),
             _tile('password', Colors.orange, tr('Changer le mot de passe', 'تغيير كلمة السر'), onTap: () => _changePassword(context)),
             _tile('devices', Colors.deepPurple, tr('Se déconnecter de tous les appareils', 'تسجيل الخروج من كل الأجهزة'), onTap: () async {
               if (await _confirm(context, tr('Déconnexion partout', 'خروج من كل الأجهزة'), tr('Vous serez déconnecté de tous vos appareils, y compris celui-ci.', 'سيتم تسجيل خروجك من كل أجهزتك بما فيها هذا الجهاز.'), tr('Déconnecter', 'خروج'))) {
@@ -334,9 +343,7 @@ class SettingsTab extends StatelessWidget {
           _section(context, 4, tr('Confidentialité et données', 'الخصوصية والبيانات'), [
             _tile('pin', Colors.red, tr('Autorisation de localisation', 'إذن الموقع'), subtitle: tr('Gérer dans les réglages du téléphone', 'إدارة من إعدادات الهاتف'), onTap: () => Geolocator.openAppSettings()),
             _tile('download', Colors.teal, tr('Exporter mes données', 'تصدير بياناتي'), subtitle: tr('Copie votre compte, vos points et vos transactions', 'ينسخ حسابك ونقاطك ومعاملاتك'), onTap: () => _export(context)),
-            _tile('shield', Colors.blue, tr('Confidentialité', 'الخصوصية'), onTap: () => _info(context, tr('Confidentialité', 'الخصوصية'), tr(
-              'Nqata ne conserve que votre prénom ou pseudo et votre e-mail. Les commerçants voient seulement votre pseudo, votre solde et vos visites chez eux, jamais votre activité ailleurs. Vous pouvez exporter ou supprimer votre compte et toutes vos données à tout moment depuis cet écran.',
-              'تحتفظ نقطة فقط باسمك أو لقبك وبريدك الإلكتروني. يرى التجار لقبك ورصيدك وزياراتك لديهم فقط، ولا يرون نشاطك في أماكن أخرى. يمكنك تصدير أو حذف حسابك وكل بياناتك في أي وقت من هذه الشاشة.'))),
+            _tile('shield', Colors.blue, tr('Politique de confidentialité', 'سياسة الخصوصية'), onTap: () => Navigator.push(context, smoothRoute(const PolicyPage()))),
             _tile('doc', Colors.grey.shade700, tr('Conditions d\'utilisation', 'شروط الاستخدام'), onTap: () => _info(context, tr('Conditions d\'utilisation', 'شروط الاستخدام'), tr(
               'Nqata est un service de cartes de fidélité entre des clients et des commerces partenaires. Les points appartiennent au programme de chaque commerce, qui peut en fixer les règles (points par visite, seuil de récompense). Vous êtes responsable de la confidentialité de vos identifiants et de votre code PIN. Ces conditions sont provisoires et seront complétées avant la publication.',
               'نقطة خدمة بطاقات ولاء بين الزبائن والمتاجر الشريكة. النقاط تابعة لبرنامج كل متجر الذي يحدد قواعده (نقاط الزيارة، حد المكافأة). أنت مسؤول عن سرية بيانات دخولك ورمز PIN. هذه الشروط مؤقتة وسيتم استكمالها قبل النشر.'))),
