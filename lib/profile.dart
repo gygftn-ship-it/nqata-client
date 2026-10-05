@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'extras.dart';
 import 'main.dart';
+import 'referral.dart';
 import 'policy.dart';
 import 'tabs.dart';
 import 'wallet.dart';
@@ -350,6 +351,7 @@ class SettingsTab extends StatelessWidget {
           ]),
           _section(context, 5, tr('Aide', 'المساعدة'), [
             _tile('history', Colors.purple, tr('Historique complet', 'السجل الكامل'), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+            _tile('gift', Colors.pink, tr('Parrainage', 'الترشيح'), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
             _tile('help', Colors.green, tr('Aide et questions fréquentes', 'المساعدة والأسئلة الشائعة'), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
             _tile('support', Colors.blue, tr('Contacter le support', 'اتصل بالدعم'), onTap: () {
               if (supportEmail.isEmpty) {
