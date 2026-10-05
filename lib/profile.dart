@@ -6,12 +6,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'extras.dart';
 import 'main.dart';
+import 'onboarding.dart';
 import 'referral.dart';
 import 'policy.dart';
 import 'tabs.dart';
 import 'wallet.dart';
 
-const supportEmail = ''; // ← à renseigner : l'e-mail du support Nqata (le bouton « Contacter le support » l'utilisera)
+const supportEmail = 'support@nqata.app'; // ← remplacez par votre vraie adresse de support
 
 const avatarColors = [Color(0xFF15120B), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
 
@@ -132,6 +133,15 @@ class SettingsTab extends StatelessWidget {
         builder: (d) => AlertDialog(title: Text(title), content: SingleChildScrollView(child: Text(body)), actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))]),
       );
 
+  Future<void> _contactSupport(BuildContext context) async {
+    final uri = Uri(scheme: 'mailto', path: supportEmail, queryParameters: {'subject': 'Nqata – ${store.name}', 'body': '\n\n---\n${store.email} · ${store.code}'});
+    try {
+      if (await launchUrl(uri)) return;
+    } catch (_) {}
+    Clipboard.setData(ClipboardData(text: supportEmail));
+    if (context.mounted) _snack(context, tr('Aucune app e-mail trouvée : adresse copiée ($supportEmail)', 'لا يوجد تطبيق بريد: تم نسخ العنوان ($supportEmail)'));
+  }
+
   void _export(BuildContext context) {
     final data = {
       'compte': {'nom': store.name, 'email': store.email, 'code_client': store.code},
@@ -146,10 +156,10 @@ class SettingsTab extends StatelessWidget {
   Widget _stat(int v, String label) => Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.55), borderRadius: BorderRadius.circular(16)),
           child: Column(children: [
-            AnimatedCount(v, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            AnimatedCount(v, style: const TextStyle(color: Colors.black87, fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
           ]),
         ),
       );
@@ -160,15 +170,17 @@ class SettingsTab extends StatelessWidget {
     final progress = next == null ? 1.0 : ((visits - from) / (next - from)).clamp(0.0, 1.0).toDouble();
     return Container(
       padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 22),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandDark, brandLight]),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandYellow, Color(0xFFFFC300)]),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+        image: const DecorationImage(image: AssetImage('robot.png'), alignment: Alignment(1.5, 1.4), scale: 1.6, opacity: 0.16),
+        boxShadow: [BoxShadow(color: brandYellow.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 10))],
       ),
       child: Column(children: [
         Row(children: [
-          Text(tr('Profil', 'الملف'), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(tr('Profil', 'الملف'), style: const TextStyle(color: Colors.black87, fontSize: 20, fontWeight: FontWeight.bold)),
           const Spacer(),
-          IconButton(icon: const NIcon('edit', color: Colors.white), onPressed: () => _editProfile(context)),
+          IconButton(icon: const NIcon('edit', color: Colors.black87), onPressed: () => _editProfile(context)),
         ]),
         TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.6, end: 1),
@@ -186,28 +198,28 @@ class SettingsTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text(store.name.isEmpty ? '…' : store.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-        Text(store.email, style: const TextStyle(color: Colors.white70)),
+        Text(store.name.isEmpty ? '…' : store.name, style: const TextStyle(color: Colors.black87, fontSize: 22, fontWeight: FontWeight.bold)),
+        Text(store.email, style: const TextStyle(color: Colors.black54)),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.55), borderRadius: BorderRadius.circular(16)),
           child: Column(children: [
             Row(children: [
               NIcon('trophy', size: 24, color: lv['color'] as Color, accent: Colors.white),
               const SizedBox(width: 8),
-              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
               const Spacer(),
-              Text(next == null ? tr('Niveau maximum', 'أعلى مستوى') : '$visits / $next ${tr('visites', 'زيارات')}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(next == null ? tr('Niveau maximum', 'أعلى مستوى') : '$visits / $next ${tr('visites', 'زيارات')}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
             ]),
             const SizedBox(height: 8),
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: progress),
               duration: const Duration(milliseconds: 900),
               curve: Curves.easeOutCubic,
-              builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 7, backgroundColor: Colors.white24, color: lv['color'] as Color)),
+              builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 7, backgroundColor: Colors.black12, color: lv['color'] as Color)),
             ),
-            if (next != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: AlignmentDirectional.centerStart, child: Text('${next - visits} ${tr('visites avant le niveau', 'زيارات قبل المستوى')} ${lv['next_name']}', style: const TextStyle(color: Colors.white70, fontSize: 12)))),
+            if (next != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: AlignmentDirectional.centerStart, child: Text('${next - visits} ${tr('visites avant le niveau', 'زيارات قبل المستوى')} ${lv['next_name']}', style: const TextStyle(color: Colors.black54, fontSize: 12)))),
           ]),
         ),
         const SizedBox(height: 14),
@@ -249,8 +261,12 @@ class SettingsTab extends StatelessWidget {
         trailing: trailing ?? (onTap != null ? const NIcon('chevron') : null),
       );
 
-  Widget _switch(String icon, Color color, String title, String subtitle, bool value, void Function(bool) onChanged) =>
-      _tile(icon, color, title, subtitle: subtitle, trailing: Switch(value: value, onChanged: (v) { HapticFeedback.selectionClick(); onChanged(v); }), onTap: () { HapticFeedback.selectionClick(); onChanged(!value); });
+  Widget _switch(String icon, Color color, String title, String subtitle, bool value, void Function(bool) onChanged, {bool enabled = true}) => _tile(
+        icon, enabled ? color : Colors.grey, title,
+        subtitle: subtitle,
+        trailing: Switch(value: value && enabled, onChanged: enabled ? (v) { HapticFeedback.selectionClick(); onChanged(v); } : null),
+        onTap: enabled ? () { HapticFeedback.selectionClick(); onChanged(!value); } : null,
+      );
 
   Widget _choice(String icon, Color color, String title, Widget control) => Padding(
         padding: const EdgeInsets.all(16),
@@ -293,9 +309,10 @@ class SettingsTab extends StatelessWidget {
             }),
           ]),
           _section(context, 2, tr('Notifications', 'الإشعارات'), [
-            _switch('coin', Colors.green, tr('Points gagnés', 'النقاط المكتسبة'), tr('À chaque visite', 'عند كل زيارة'), store.nPoints, (v) => store.setNotifPref('points', v)),
-            _switch('gift', Colors.amber.shade700, tr('Récompenses', 'المكافآت'), tr('Récompense débloquée ou utilisée', 'مكافأة مفتوحة أو مستخدمة'), store.nRewards, (v) => store.setNotifPref('rewards', v)),
-            _switch('tag', Colors.pink, tr('Offres des commerces', 'عروض المتاجر'), tr('Vos commerces et favoris', 'متاجرك ومفضلتك'), store.nOffers, (v) => store.setNotifPref('offers', v)),
+            _switch('bell', brandLight, tr('Notifications activées', 'الإشعارات مفعّلة'), tr('Tout activer ou tout désactiver', 'تفعيل أو إيقاف الكل'), store.notifsOn, (v) => store.setNotifsOn(v)),
+            _switch('coin', Colors.green, tr('Points gagnés', 'النقاط المكتسبة'), tr('À chaque visite', 'عند كل زيارة'), store.nPoints, (v) => store.setNotifPref('points', v), enabled: store.notifsOn),
+            _switch('gift', Colors.amber.shade700, tr('Récompenses', 'المكافآت'), tr('Récompense débloquée ou utilisée', 'مكافأة مفتوحة أو مستخدمة'), store.nRewards, (v) => store.setNotifPref('rewards', v), enabled: store.notifsOn),
+            _switch('tag', Colors.pink, tr('Offres des commerces', 'عروض المتاجر'), tr('Vos commerces et favoris', 'متاجرك ومفضلتك'), store.nOffers, (v) => store.setNotifPref('offers', v), enabled: store.notifsOn),
             _tile('bell', Colors.grey, tr('Notifications quand l\'app est fermée', 'إشعارات عند إغلاق التطبيق'), subtitle: tr('Bientôt disponible', 'قريبًا')),
           ]),
           _section(context, 3, tr('Apparence et langue', 'المظهر واللغة'), [
@@ -352,14 +369,9 @@ class SettingsTab extends StatelessWidget {
           _section(context, 5, tr('Aide', 'المساعدة'), [
             _tile('history', Colors.purple, tr('Historique complet', 'السجل الكامل'), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
             _tile('gift', Colors.pink, tr('Parrainage', 'الترشيح'), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
+            _tile('qr_scan', Colors.indigo, tr('Revoir le tutoriel', 'إعادة مشاهدة الشرح'), subtitle: tr('Les 3 écrans de présentation', 'شاشات العرض الثلاث'), onTap: () => Navigator.push(context, smoothRoute(const OnboardingPage(replay: true)))),
             _tile('help', Colors.green, tr('Aide et questions fréquentes', 'المساعدة والأسئلة الشائعة'), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
-            _tile('support', Colors.blue, tr('Contacter le support', 'اتصل بالدعم'), onTap: () {
-              if (supportEmail.isEmpty) {
-                _info(context, tr('Support', 'الدعم'), tr('Le contact du support sera bientôt disponible dans l\'application.', 'سيتوفر الاتصال بالدعم قريبًا في التطبيق.'));
-              } else {
-                launchUrl(Uri.parse('mailto:$supportEmail?subject=Nqata'));
-              }
-            }),
+            _tile('support', Colors.blue, tr('Contacter le support', 'اتصل بالدعم'), subtitle: supportEmail, onTap: () => _contactSupport(context)),
           ]),
           _section(context, 6, tr('À propos', 'حول'), [
             _tile('info', Colors.grey, 'Nqata', subtitle: '${tr('Version', 'الإصدار')} 0.1.0'),
