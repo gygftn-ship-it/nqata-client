@@ -21,6 +21,7 @@ import 'push.dart';
 import 'policy.dart';
 import 'profile.dart';
 import 'wallet.dart';
+import 'mascot.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
@@ -63,6 +64,7 @@ class Store extends ChangeNotifier {
   // Réglages
   ThemeMode themeMode = ThemeMode.system;
   double textScale = 1.0;
+  bool notifsOn = true;
   bool nPoints = true, nRewards = true, nOffers = true;
   int avatarColor = 0;
   bool bioEnabled = false; // déverrouillage du portefeuille par empreinte
@@ -91,7 +93,7 @@ class Store extends ChangeNotifier {
     if (b.startsWith('+')) return nPoints;
     if (b.contains('Récompense')) return nRewards;
     if (b.toLowerCase().contains('offre')) return nOffers;
-    return true;
+    return notifsOn;
   }
 
   List<Map<String, dynamic>> get notifsShown => notifs.where(notifAllowed).toList();
@@ -269,6 +271,15 @@ class Store extends ChangeNotifier {
   void setThemeMode(ThemeMode m) { themeMode = m; _save('theme', m.name); notifyListeners(); }
   void setTextScale(double s) { textScale = s; _save('tscale', s); notifyListeners(); }
   void setAvatarColor(int i) { avatarColor = i; _save('avatar', i); notifyListeners(); }
+  Future<void> setNotifsOn(bool v) async {
+    notifsOn = v;
+    await _save('notifs_on', v);
+    try {
+      v ? await Push.register(points: nPoints, rewards: nRewards, offers: nOffers) : await Push.unregister();
+    } catch (_) {}
+    notifyListeners();
+  }
+
   void setNotifPref(String k, bool v) {
     if (k == 'points') nPoints = v;
     if (k == 'rewards') nRewards = v;
@@ -467,6 +478,7 @@ Future<void> main() async {
   store.pinSalt = prefs.getString('pin_salt');
   store.themeMode = ThemeMode.values.firstWhere((m) => m.name == prefs.getString('theme'), orElse: () => ThemeMode.system);
   store.textScale = prefs.getDouble('tscale') ?? 1.0;
+  store.notifsOn = prefs.getBool('notifs_on') ?? true;
   store.nPoints = prefs.getBool('n_points') ?? true;
   store.nRewards = prefs.getBool('n_rewards') ?? true;
   store.nOffers = prefs.getBool('n_offers') ?? true;
@@ -593,9 +605,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
 
   // Le portefeuille se reverrouille quand l'app passe en arrière-plan
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused) store.lock();
-  }
+  void didChangeAppLifecycleState(AppLifecycleState s) {}  // le portefeuille ne se reverrouille plus en arrière-plan : une seule demande par ouverture de l'app
 
   // Bandeau affiché quand une notification arrive pendant que l'app est ouverte
   void _onStore() {
@@ -637,7 +647,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         if (store.offline) offlineBanner(),
         FloatingNav(
           index: tab,
-          onTap: (i) { HapticFeedback.selectionClick(); if (tab == 2 && i != 2) store.lock(); setState(() => tab = i); },
+          onTap: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
           items: [
             ('home', 'home', tr('Accueil', 'الرئيسية')),
             ('pin', 'pin', tr('Carte', 'الخريطة')),
