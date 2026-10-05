@@ -5,7 +5,8 @@ import 'tabs.dart';
 
 /// Écrans de bienvenue (3 étapes) au premier lancement.
 class OnboardingPage extends StatefulWidget {
-  const OnboardingPage({super.key});
+  final bool replay; // true : rouvert depuis le Profil, ne relance pas l'inscription
+  const OnboardingPage({super.key, this.replay = false});
   @override
   State<OnboardingPage> createState() => _OnboardingPageState();
 }
@@ -23,20 +24,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   void dispose() { pc.dispose(); super.dispose(); }
 
-  Widget _slide((String, String, String, String, String) s) => Padding(
+  Widget _slide((String, String, String, String) s) => Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           FadeSlideIn(
             child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
-              child: NIcon(s.$1, size: 96, color: Colors.white),
+              constraints: const BoxConstraints(maxWidth: 260),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+              child: Text(tr(s.$3, s.$4), textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF15120B), fontSize: 15, fontWeight: FontWeight.w600)),
             ),
           ),
-          const SizedBox(height: 32),
-          Text(tr(s.$2, s.$3), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Text(tr(s.$4, s.$5), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+          const SizedBox(height: 10),
+          FadeSlideIn(index: 1, child: Image.asset('robot.png', height: 180)),
+          const SizedBox(height: 24),
+          Text(tr(s.$1, s.$2), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
         ]),
       );
 
@@ -54,7 +56,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     TextButton(onPressed: () => store.setLang('fr'), child: Text('FR', style: TextStyle(color: Colors.white, fontWeight: lang == 'fr' ? FontWeight.bold : FontWeight.normal))),
                     TextButton(onPressed: () => store.setLang('ar'), child: Text('عربي', style: TextStyle(color: Colors.white, fontWeight: lang == 'ar' ? FontWeight.bold : FontWeight.normal))),
                     const Spacer(),
-                    TextButton(onPressed: store.finishOnboarding, child: Text(tr('Passer', 'تخطي'), style: const TextStyle(color: Colors.white70))),
+                    TextButton(onPressed: () => widget.replay ? Navigator.pop(context) : store.finishOnboarding(), child: Text(tr(widget.replay ? 'Fermer' : 'Passer', widget.replay ? 'إغلاق' : 'تخطي'), style: const TextStyle(color: Colors.white70))),
                   ]),
                 ),
                 Expanded(child: PageView(controller: pc, onPageChanged: (i) => setState(() => page = i), children: [for (final s in slides) _slide(s)])),
@@ -76,7 +78,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandDark, padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: () => page < slides.length - 1
                           ? pc.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOut)
-                          : store.finishOnboarding(),
+                          : (widget.replay ? Navigator.pop(context) : store.finishOnboarding()),
                       child: Text(page < slides.length - 1 ? tr('Suivant', 'التالي') : tr('Commencer', 'ابدأ')),
                     ),
                   ),
