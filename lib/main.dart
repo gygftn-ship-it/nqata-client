@@ -39,6 +39,10 @@ String errText(Object e) {
   if (m.contains('confirm_email')) return tr('Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول');
   if (m.contains('rate limit')) return tr('Trop d\'e-mails envoyés, réessayez plus tard', 'رسائل كثيرة، حاول لاحقًا');
   if (m.contains('not_visited')) return tr('Visitez ce commerce avant de le noter', 'زر هذا المتجر قبل تقييمه');
+  if (m.contains('already_referred')) return tr('Vous avez déjà un parrain', 'لديك راعٍ بالفعل');
+  if (m.contains('referral_too_late')) return tr('Trop tard : vous avez déjà visité un commerce', 'فات الأوان: زرت متجرًا بالفعل');
+  if (m.contains('code_not_found')) return tr('Code introuvable', 'الرمز غير موجود');
+  if (m.contains('own_code')) return tr('Vous ne pouvez pas utiliser votre propre code', 'لا يمكنك استخدام رمزك الخاص');
   if (m.contains('bio_unavailable')) return tr('Aucune empreinte enregistrée sur ce téléphone : ajoutez-en une dans ses réglages', 'لا توجد بصمة مسجلة على هذا الهاتف: أضف واحدة من الإعدادات');
   return tr('Erreur : $m', 'خطأ: $m');
 }
@@ -49,6 +53,7 @@ class Store extends ChangeNotifier {
   String name = '';
   String code = ''; // code client affiché sous le QR
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
+  bool referredBy = false;
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
@@ -105,8 +110,9 @@ class Store extends ChangeNotifier {
 
   Future<void> refresh() async {
     try {
-      final p = await sb.from('profiles').select('display_name').eq('id', uid).maybeSingle();
+      final p = await sb.from('profiles').select('display_name, referred_by').eq('id', uid).maybeSingle();
       name = (p?['display_name'] as String?) ?? '';
+      referredBy = p?['referred_by'] != null;
     } catch (_) {
       offline = true;
       notifyListeners();
@@ -132,6 +138,7 @@ class Store extends ChangeNotifier {
     lastSync = DateTime.now();
     _checkRewards();
     _saveCache();
+    try { await sb.rpc('expire_my_points'); } catch (_) {}
     notifyListeners();
   }
 
@@ -343,11 +350,24 @@ class Store extends ChangeNotifier {
     return const Distance().distance(me!, LatLng(lat, lng)) / 1000;
   }
 
-  Future<void> rate(String shopId, int n) async {
-    await sb.rpc('rate_shop', params: {'p_shop': shopId, 'p_rating': n});
+  Future<void> rate(String shopId, int n, {String? comment}) async {
+    await sb.rpc('rate_shop', params: {'p_shop': shopId, 'p_rating': n, if (comment != null) 'p_comment': comment});
     myRatings[shopId] = n;
     notifyListeners();
     await refresh();
+  }
+
+  Future<List<Map<String, dynamic>>> shopReviews(String shopId) =>
+      _q(sb.from('shop_reviews_public').select('id, display_name, rating, comment, created_at, reply, replied_at').eq('shop_id', shopId).order('created_at', ascending: false));
+
+  // ----- Parrainage -----
+  Future<String> applyReferral(String code) async => await sb.rpc('apply_referral', params: {'p_code': code}) as String;
+  Future<Map<String, dynamic>> referralStats() async {
+    try {
+      return Map<String, dynamic>.from(await sb.rpc('referral_stats') as Map);
+    } catch (_) {
+      return {'friends': 0, 'paid': 0};
+    }
   }
 
   Future<void> toggleFav(String id) async {
