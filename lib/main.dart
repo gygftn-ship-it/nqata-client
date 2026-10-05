@@ -21,7 +21,6 @@ import 'push.dart';
 import 'policy.dart';
 import 'profile.dart';
 import 'wallet.dart';
-import 'mascot.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
