@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 import 'main.dart';
 import 'tabs.dart';
 
@@ -93,10 +94,18 @@ class ShopLogo extends StatelessWidget {
 }
 
 /// Fenêtre d'un commerce : fond, logo, note, description, horaires, localisation, offres, partage.
-class ShopPage extends StatelessWidget {
+class ShopPage extends StatefulWidget {
   final Map<String, dynamic> shop;
   final double? km;
   const ShopPage({super.key, required this.shop, this.km});
+  @override
+  State<ShopPage> createState() => _ShopPageState();
+}
+
+class _ShopPageState extends State<ShopPage> {
+  int myStars = 0;
+  late Future<List<Map<String, dynamic>>> reviews = store.shopReviews('${widget.shop['id']}');
+  final comment = TextEditingController();
 
   void _share(BuildContext context, Map<String, dynamic> s) {
     final lat = (s['lat'] as num?)?.toDouble(), lng = (s['lng'] as num?)?.toDouble();
@@ -122,10 +131,16 @@ class ShopPage extends StatelessWidget {
       );
 
   @override
+  void initState() { super.initState(); myStars = store.myRatings['${widget.shop['id']}'] ?? 0; }
+
+  @override
+  void dispose() { comment.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) {
-          final s = store.shops.firstWhere((x) => x['id'] == shop['id'], orElse: () => shop);
+          final s = store.shops.firstWhere((x) => x['id'] == widget.shop['id'], orElse: () => widget.shop);
           final id = '${s['id']}';
           final theme = Theme.of(context);
           final fav = store.favs.contains(id);
@@ -243,20 +258,68 @@ class ShopPage extends StatelessWidget {
                     for (var i = 1; i <= 5; i++)
                       IconButton(
                         padding: EdgeInsets.zero,
-                        onPressed: visited
-                            ? () async {
-                                try {
-                                  await store.rate(id, i);
-                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Merci pour votre note !', 'شكرًا على تقييمك!'))));
-                                } catch (e) {
-                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
-                                }
-                              }
-                            : null,
-                        icon: NIcon(i <= my ? 'star_fill' : 'star', color: Colors.amber, size: 36),
+                        onPressed: visited ? () => setState(() => myStars = i) : null,
+                        icon: NIcon(i <= myStars ? 'star_fill' : 'star', color: Colors.amber, size: 36),
                       ),
                   ]),
                   if (!visited) Text(tr('Visitez ce commerce pour pouvoir le noter.', 'زر هذا المتجر لتتمكن من تقييمه.'), style: const TextStyle(color: Colors.grey)),
+                  if (visited && myStars > 0) ...[
+                    const SizedBox(height: 8),
+                    TextField(controller: comment, maxLength: 500, maxLines: 3, decoration: InputDecoration(hintText: tr('Votre avis (optionnel)', 'رأيك (اختياري)'), border: const OutlineInputBorder())),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: FilledButton(
+                        onPressed: () async {
+                          try {
+                            await store.rate(id, myStars, comment: comment.text.trim().isEmpty ? null : comment.text.trim());
+                            if (mounted) setState(() => reviews = store.shopReviews(id));
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Merci pour votre avis !', 'شكرًا على رأيك!'))));
+                          } catch (e) {
+                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
+                          }
+                        },
+                        child: Text(tr('Publier', 'نشر')),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Text(tr('Avis des clients', 'آراء الزبائن'), style: theme.textTheme.titleMedium),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: reviews,
+                    builder: (_, snap) {
+                      final list = snap.data ?? const [];
+                      if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: CircularProgressIndicator()));
+                      if (list.isEmpty) return Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(tr('Aucun avis pour le moment', 'لا توجد آراء حاليًا')));
+                      return Column(children: [
+                        for (final rv in list)
+                          Container(
+                            margin: const EdgeInsets.only(top: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(children: [
+                                Expanded(child: Text('${rv['display_name']}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                                for (var i = 1; i <= 5; i++) NIcon(i <= (rv['rating'] as int) ? 'star_fill' : 'star', size: 14, color: Colors.amber),
+                              ]),
+                              const SizedBox(height: 4),
+                              Text('${rv['comment']}'),
+                              if (rv['reply'] != null) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(10)),
+                                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text('${s['name']} : ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    Expanded(child: Text('${rv['reply']}', style: const TextStyle(fontSize: 12))),
+                                  ]),
+                                ),
+                              ],
+                            ]),
+                          ),
+                      ]);
+                    },
+                  ),
                   const SizedBox(height: 18),
                   FilledButton.icon(icon: const NIcon('share'), label: Text(tr('Copier le lien de partage', 'نسخ رابط المشاركة')), onPressed: () => _share(context, s)),
                   const SizedBox(height: 32),
