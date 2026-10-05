@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'extras.dart';
+import 'mascot.dart';
 import 'main.dart';
 import 'notifs.dart';
 import 'profile.dart';
@@ -255,9 +256,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           final favs = store.shops.where((s) => store.favs.contains('${s['id']}')).toList();
           final acts = store.txs.where((t) => t['undone'] != true).take(4).toList();
           final ready = store.rewardsReady;
-          return RefreshIndicator(
-            onRefresh: store.refresh,
-            child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+          return Stack(children: [
+            RefreshIndicator(
+              onRefresh: store.refresh,
+              child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), children: [
               FadeSlideIn(
                 child: Row(children: [
                   Pressable(
@@ -427,7 +429,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ),
                 ),
             ]),
-          );
+            ),
+            const PositionedDirectional(end: 16, bottom: 8, child: MascotPeek()),
+          ]);
         },
       );
 }
