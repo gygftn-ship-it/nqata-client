@@ -692,7 +692,7 @@ ThemeData buildTheme(Brightness b) {
     onPrimary: Colors.black,
     secondaryContainer: brandYellow,
     onSecondaryContainer: Colors.black,
-    surface: light ? const Color(0xFFFFFCF0) : const Color(0xFF0F0E0B),
+    surface: light ? Colors.white : const Color(0xFF0F0E0B),
   );
   final link = light ? ink : brandYellow;
   return ThemeData(
