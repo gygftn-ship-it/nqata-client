@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'profile.dart';
 
 /// La mascotte Nqata : flotte doucement, cligne des yeux de temps en temps,
 /// et parle dans une bulle avec un message qui dépend de ce qui se passe dans l'app.
