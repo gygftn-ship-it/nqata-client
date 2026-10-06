@@ -54,6 +54,7 @@ class Store extends ChangeNotifier {
   String code = ''; // code client affiché sous le QR
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
   bool referredBy = false;
+  int streakWeeks = 0;
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
@@ -114,6 +115,8 @@ class Store extends ChangeNotifier {
       final p = await sb.from('profiles').select('display_name, referred_by').eq('id', uid).maybeSingle();
       name = (p?['display_name'] as String?) ?? '';
       referredBy = p?['referred_by'] != null;
+      streakWeeks = (p?['streak_weeks'] as int?) ?? 0;
+      try { streakWeeks = await sb.rpc('check_my_streak') as int; } catch (_) {}
     } catch (_) {
       offline = true;
       notifyListeners();
@@ -372,6 +375,7 @@ class Store extends ChangeNotifier {
 
   // ----- Parrainage -----
   Future<String> applyReferral(String code) async => await sb.rpc('apply_referral', params: {'p_code': code}) as String;
+  Future<List<Map<String, dynamic>>> friendLeaderboard() => _q(sb.rpc('friend_leaderboard'));
   Future<Map<String, dynamic>> referralStats() async {
     try {
       return Map<String, dynamic>.from(await sb.rpc('referral_stats') as Map);
