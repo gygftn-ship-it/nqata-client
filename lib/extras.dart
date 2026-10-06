@@ -78,7 +78,7 @@ class HelpPage extends StatelessWidget {
     ('Le commerçant n\'arrive pas à scanner', 'التاجر لا يستطيع المسح', 'Augmentez la luminosité, gardez l\'écran allumé sur l\'accueil, ou donnez-lui votre code client à 6 caractères.', 'ارفع سطوع الشاشة وأبقها مضاءة في الرئيسية، أو أعطه رمز الزبون المكوّن من 6 خانات.'),
     ('Mes points valent-ils partout ?', 'هل نقاطي صالحة في كل مكان؟', 'Non : chaque commerce a son propre programme. Vos cartes montrent vos points commerce par commerce.', 'لا: لكل متجر برنامجه الخاص. تُظهر بطاقاتك نقاطك في كل متجر.'),
     ('Comment utiliser une récompense ?', 'كيف أستخدم المكافأة؟', 'Quand votre carte affiche une récompense disponible, montrez votre code au commerçant : il la valide et déduit les points.', 'عندما تظهر مكافأة متاحة في بطاقتك، أظهر رمزك للتاجر ليؤكدها ويخصم النقاط.'),
-    ('Comment supprimer mon compte ?', 'كيف أحذف حسابي؟', 'Dans Profil, touchez « Supprimer mon compte ». Vos données sont effacées définitivement.', 'في الملف الشخصي، المس «حذف حسابي». تُحذف بياناتك نهائيًا.'),
+    ('Comment supprimer mon compte ?', 'كيف أحذف حسابي؟', 'Dans Profil › Paramètres, touchez « Supprimer mon compte ». Vos données sont effacées définitivement.', 'في الملف الشخصي › الإعدادات، المس «حذف حسابي». تُحذف بياناتك نهائيًا.'),
   ];
 
   @override
