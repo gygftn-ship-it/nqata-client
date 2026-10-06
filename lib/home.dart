@@ -331,6 +331,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 ),
               ],
               const SizedBox(height: 18),
+              if (store.streakWeeks > 0)
+                FadeSlideIn(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(16)),
+                    child: Row(children: [
+                      const NIcon('bolt', color: Colors.orange),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(tr('${store.streakWeeks} semaine(s) de suite avec une visite !', '${store.streakWeeks} أسبوع متتالٍ بزيارة!'), style: const TextStyle(fontWeight: FontWeight.w600))),
+                    ]),
+                  ),
+                ),
               FadeSlideIn(
                 index: 4,
                 child: Row(children: [
