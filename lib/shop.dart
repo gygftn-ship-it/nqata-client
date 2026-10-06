@@ -190,7 +190,7 @@ class _ShopPageState extends State<ShopPage> {
                       child: Column(children: [
                         _row('history', '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
                         _row('pin', '${s['address'] ?? ''}'),
-                        if ((km ?? store.km(s)) != null) _row('near', '${(km ?? store.km(s))!.toStringAsFixed(1)} km'),
+                        if ((widget.km ?? store.km(s)) != null) _row('near', '${(widget.km ?? store.km(s))!.toStringAsFixed(1)} km'),
                       ]),
                     ),
                   ),
