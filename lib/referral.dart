@@ -52,7 +52,7 @@ class _ReferralPageState extends State<ReferralPage> {
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors: [brandDark, brandLight])),
             child: Column(children: [
-              const NIcon('gift', size: 44, color: Colors.white, accent: Colors.amber),
+              NIcon('gift', size: 44, color: Colors.white, accent: Colors.amber),
               const SizedBox(height: 10),
               Text(tr('Invitez vos amis', 'ادعُ أصدقاءك'), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
@@ -67,7 +67,7 @@ class _ReferralPageState extends State<ReferralPage> {
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: brandDark),
                 onPressed: _share,
-                icon: const NIcon('share', size: 18),
+                icon: NIcon('share', size: 18),
                 label: Text(tr('Partager mon code', 'مشاركة رمزي')),
               ),
             ]),
