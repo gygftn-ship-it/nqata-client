@@ -67,6 +67,7 @@ const _icons = <String, String>{
   'back': r'<path d="M19 12H5M11 6l-6 6 6 6"/>',
   'add': r'<path d="M12 5v14M5 12h14"/>',
   'block': r'<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
+  'settings': r'<circle cx="12" cy="12" r="6.3"/><circle cx="12" cy="12" r="2.2" fill="{A}" stroke="none"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6"/>',
   'near': r'<path d="M20 4 4.5 10.5l6 2.5 2.5 6z"/><circle cx="10.2" cy="12.8" r="1.2" fill="{A}" stroke="none"/>',
 };
 
