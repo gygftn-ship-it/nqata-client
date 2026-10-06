@@ -33,21 +33,22 @@ class _PressableState extends State<Pressable> {
       );
 }
 
-/// Anneau de compte à rebours autour du QR (passe à l'ambre avant le renouvellement).
+/// Anneau de compte à rebours autour du QR (passe au rouge avant le renouvellement).
 class _RingPainter extends CustomPainter {
   final double t; // 1 → 0
-  _RingPainter(this.t);
+  final Color track, arc;
+  _RingPainter(this.t, {required this.track, required this.arc});
   @override
   void paint(Canvas canvas, Size size) {
     final r = Rect.fromLTWH(6, 6, size.width - 12, size.height - 12);
-    final track = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..color = Colors.white24;
-    final arc = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.redAccent : brandYellow;
-    canvas.drawArc(r, 0, 2 * pi, false, track);
-    canvas.drawArc(r, -pi / 2, 2 * pi * t, false, arc);
+    final trackPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..color = track;
+    final arcPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.redAccent : arc;
+    canvas.drawArc(r, 0, 2 * pi, false, trackPaint);
+    canvas.drawArc(r, -pi / 2, 2 * pi * t, false, arcPaint);
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.t != t;
+  bool shouldRepaint(_RingPainter old) => old.t != t || old.track != track || old.arc != arc;
 }
 
 class _QrFull extends StatelessWidget {
@@ -126,6 +127,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     super.dispose();
   }
 
+  // ---------- Couleurs du thème ----------
+  bool get _dark => Theme.of(context).brightness == Brightness.dark;
+  Color get _tint => brandYellow.withOpacity(_dark ? 0.12 : 0.22); // fond « jaune pâle » des cartes
+  Color get _ink => Theme.of(context).colorScheme.onSurface;
+  Color get _gold => _dark ? brandYellow : brandLight; // accent lisible sur fond pâle ou sombre
+
   String _greeting() {
     final h = DateTime.now().hour;
     return h < 12 ? tr('Bonjour', 'صباح الخير') : h < 18 ? tr('Bon après-midi', 'طاب يومك') : tr('Bonsoir', 'مساء الخير');
@@ -133,36 +140,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
 
   void _openShop(Map<String, dynamic> s) => Navigator.push(context, smoothRoute(ShopPage(shop: s)));
 
+  // ---------- Morceaux d'interface ----------
   Widget _title(String t, {VoidCallback? more}) => Padding(
-        padding: const EdgeInsets.only(top: 22, bottom: 10),
+        padding: const EdgeInsets.only(top: 26, bottom: 12),
         child: Row(children: [
-          Expanded(child: Text(t, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold))),
+          Expanded(child: Text(t, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2))),
           if (more != null) TextButton(onPressed: more, child: Text(tr('Voir tout', 'عرض الكل'))),
         ]),
       );
 
-  Widget _qrCard() => AnimatedBuilder(
-        animation: pulse,
-        builder: (_, child) => Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandDark, brandLight]),
-            boxShadow: [BoxShadow(color: brandLight.withOpacity(0.25 + 0.2 * pulse.value), blurRadius: 24 + 16 * pulse.value, offset: const Offset(0, 10))],
+  /// Cloche mascotte : une image quand il y a des notifications non lues, une autre sinon.
+  Widget _bell() {
+    final has = store.unread > 0;
+    return Semantics(
+      button: true,
+      label: tr('Notifications', 'الإشعارات'),
+      child: Pressable(
+        onTap: () => Navigator.push(context, smoothRoute(const NotificationsPage())),
+        child: AnimatedBuilder(
+          animation: bell,
+          builder: (_, child) => Transform.rotate(angle: has && bell.value < 0.15 ? sin(bell.value / 0.15 * pi * 6) * 0.2 : 0, child: child),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Image.asset(has ? 'notif_new.png' : 'notif_none.png', key: ValueKey(has), width: 56, height: 56),
           ),
-          child: child,
         ),
+      ),
+    );
+  }
+
+  Widget _header(Map<String, dynamic> lv) => Row(children: [
+        Pressable(
+          onTap: () => widget.goTo(4),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [lv['color'] as Color, Colors.white, lv['color'] as Color])),
+            child: CircleAvatar(radius: 24, backgroundColor: avatarColors[store.avatarColor % avatarColors.length], child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_greeting(), style: Theme.of(context).textTheme.bodyMedium),
+            Text(store.name.isEmpty ? '…' : store.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+          ]),
+        ),
+        _bell(),
+      ]);
+
+  /// Grande carte du haut : solde de points + QR qui se renouvelle + code client.
+  Widget _qrCard() => Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 12, 18),
+        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(28)),
         child: ValueListenableBuilder<String>(
           valueListenable: tokenN,
           builder: (_, token, __) => Column(children: [
             Row(children: [
-              Image.asset('coin.png', width: 28, height: 28),
-              const SizedBox(width: 8),
-              Text(tr('Mon QR personnel', 'رمزي الشخصي'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              const Spacer(),
-              IconButton(icon: const NIcon('refresh', color: Colors.white70), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('Mes points', 'نقاطي'), style: TextStyle(color: _gold, fontWeight: FontWeight.w800, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Row(children: [
+                    Image.asset('coin.png', width: 30, height: 30),
+                    const SizedBox(width: 8),
+                    AnimatedCount(store.total, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, height: 1.1)),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('${tr('pts', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.65)))),
+                  ]),
+                ]),
+              ),
+              IconButton(icon: NIcon('refresh', color: _ink.withOpacity(0.7), accent: _gold), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
             ]),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             GestureDetector(
               onTap: token.isEmpty ? null : () { HapticFeedback.mediumImpact(); Navigator.push(context, smoothRoute(_QrFull(token: tokenN))); },
               child: SizedBox(
@@ -173,11 +222,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     key: ValueKey(token),
                     tween: Tween(begin: 1, end: 0),
                     duration: const Duration(seconds: rotationSeconds),
-                    builder: (_, v, __) => CustomPaint(size: const Size(252, 252), painter: _RingPainter(token.isEmpty ? 0 : v)),
+                    builder: (_, v, __) => CustomPaint(size: const Size(252, 252), painter: _RingPainter(token.isEmpty ? 0 : v, track: _ink.withOpacity(0.10), arc: _gold)),
                   ),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 4))]),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 450),
                       transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.92, end: 1.0).animate(a), child: c)),
@@ -202,52 +251,225 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
               ),
             ),
             const SizedBox(height: 4),
-            Text(tr('Touchez le QR pour l\'agrandir · renouvelé toutes les 45 s', 'المس الرمز لتكبيره · يتجدد كل 45 ثانية'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            Text(tr('Touchez le QR pour l\'agrandir · renouvelé toutes les 45 s', 'المس الرمز لتكبيره · يتجدد كل 45 ثانية'), textAlign: TextAlign.center, style: TextStyle(color: _ink.withOpacity(0.6), fontSize: 11)),
             const SizedBox(height: 12),
-            Pressable(
-              onTap: () {
-                if (store.code.isEmpty) return;
-                Clipboard.setData(ClipboardData(text: store.code));
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Code copié', 'تم نسخ الرمز'))));
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(16)),
-                child: Column(children: [
-                  Text(tr('Mon code client · à donner si le scan ne marche pas', 'رمز الزبون · أعطه إن لم ينجح المسح'), style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
-                    const SizedBox(width: 8),
-                    const NIcon('copy', color: Colors.white70, size: 18),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: Pressable(
+                onTap: () {
+                  if (store.code.isEmpty) return;
+                  Clipboard.setData(ClipboardData(text: store.code));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Code copié', 'تم نسخ الرمز'))));
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  decoration: BoxDecoration(color: brandDark, borderRadius: BorderRadius.circular(18)),
+                  child: Column(children: [
+                    Text(tr('Mon code client · à donner si le scan ne marche pas', 'رمز الزبون · أعطه إن لم ينجح المسح'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    const SizedBox(height: 2),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: brandYellow, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
+                      const SizedBox(width: 10),
+                      const NIcon('copy', color: Colors.white70, size: 18),
+                    ]),
                   ]),
-                ]),
+                ),
               ),
             ),
           ]),
         ),
       );
 
-  Widget _action(String icon, String label, List<Color> colors, VoidCallback onTap) => Expanded(
+  /// Icône ronde sur fond jaune pâle + libellé (comme la grille de services du modèle).
+  Widget _action(String icon, String label, VoidCallback onTap) => Expanded(
         child: Pressable(
           onTap: onTap,
           child: Column(children: [
             Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(colors: colors), boxShadow: [BoxShadow(color: colors.last.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 4))]),
-              child: NIcon(icon, color: Colors.white, size: 28),
+              width: 66,
+              height: 66,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: _tint),
+              child: NIcon(icon, size: 30, color: _ink, accent: _gold),
             ),
-            const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 8),
+            Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.2)),
           ]),
         ),
       );
+
+  Widget _readyBanner(List<String> ready) => Pressable(
+        onTap: () => widget.goTo(2),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: [Colors.amber.shade300, Colors.amber.shade600])),
+          child: Row(children: [
+            AnimatedBuilder(animation: pulse, builder: (_, __) => Transform.scale(scale: 1 + 0.15 * pulse.value, child: const NIcon('gift', size: 40, color: Colors.black87, accent: Colors.white))),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tr('Une récompense vous attend !', 'مكافأة بانتظارك!'), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 2),
+                Text('${ready.join(', ')} · ${tr('montrez votre code au commerçant', 'أظهر رمزك للتاجر')}', style: const TextStyle(color: Colors.black87, fontSize: 12)),
+              ]),
+            ),
+            const NIcon('chevron', color: Colors.black54),
+          ]),
+        ),
+      );
+
+  /// Bannières d'offres (défilement horizontal).
+  Widget _offerBanners(List<Map<String, dynamic>> deals) => SizedBox(
+        height: 150,
+        child: ListView(scrollDirection: Axis.horizontal, children: [
+          for (var i = 0; i < deals.length; i++)
+            Pressable(
+              onTap: () {
+                final s = store.shops.where((x) => x['id'] == deals[i]['shop_id']).toList();
+                if (s.isNotEmpty) _openShop(s.first);
+              },
+              child: Container(
+                width: 270,
+                margin: const EdgeInsetsDirectional.only(end: 12),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: cardGrads[i % cardGrads.length])),
+                child: Stack(children: [
+                  PositionedDirectional(end: -16, bottom: -16, child: NIcon('tag', size: 120, color: Colors.white.withOpacity(0.14), accent: Colors.white.withOpacity(0.14))),
+                  Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: brandYellow, borderRadius: BorderRadius.circular(20)),
+                        child: Text('${(deals[i]['shops'] as Map?)?['name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 11)),
+                      ),
+                      Text('${deals[i]['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, height: 1.15)),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+        ]),
+      );
+
+  /// Favoris : pastilles rondes avec anneau doré (comme les « stories » du modèle).
+  Widget _favsCard(List<Map<String, dynamic>> favs) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(24)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            NIcon('star', size: 24, color: _ink, accent: _gold),
+            const SizedBox(width: 8),
+            Text(tr('Mes favoris', 'مفضلتي'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 12),
+          if (favs.isEmpty)
+            Text(tr('Touchez l’étoile sur la fiche d’un commerce pour le retrouver ici.', 'المس النجمة في صفحة المتجر لتجده هنا.'), style: TextStyle(color: _ink.withOpacity(0.6)))
+          else
+            SizedBox(
+              height: 96,
+              child: ListView(scrollDirection: Axis.horizontal, children: [
+                for (final s in favs)
+                  Pressable(
+                    onTap: () => _openShop(s),
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 14),
+                      child: Column(children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [brandYellow, brandLight, brandYellow])),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.surface),
+                            child: ClipOval(child: ShopLogo(shop: s, size: 54)),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(width: 68, child: Text('${s['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600))),
+                      ]),
+                    ),
+                  ),
+              ]),
+            ),
+        ]),
+      );
+
+  /// Carte « niveau fidélité » (comme la bannière Yassir Plus du modèle).
+  Widget _levelCard(Map<String, dynamic> lv, int? next, double progress) {
+    final c = lv['color'] as Color;
+    return Pressable(
+      onTap: () => widget.goTo(4),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(24)),
+        child: Row(children: [
+          Container(
+            width: 64,
+            height: 64,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: c.withOpacity(0.18)),
+            child: NIcon('trophy', size: 34, color: c),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('Votre niveau fidélité', 'مستوى ولائك'), style: TextStyle(color: _gold, fontWeight: FontWeight.w700, fontSize: 12)),
+              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 8),
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 7, color: c, backgroundColor: _ink.withOpacity(0.10))),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                next == null ? tr('Niveau maximum atteint', 'وصلت لأعلى مستوى') : '${next - (lv['visits'] as int)} ${tr('visites avant le prochain niveau', 'زيارة للمستوى التالي')}',
+                style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.7)),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          NIcon('chevron', color: _ink, accent: _gold),
+        ]),
+      ),
+    );
+  }
+
+  Widget _activityTile(Map<String, dynamic> a) {
+    final reward = a['type'] == 'reward';
+    final amount = a['amount'] as int;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(20)),
+        child: Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: reward ? brandYellow : Theme.of(context).colorScheme.surface),
+            child: NIcon(reward ? 'gift' : 'add', size: 22, color: reward ? Colors.black87 : _ink, accent: reward ? Colors.white : _gold),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${a['shop'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              Text(fmtDate(a['at'] as String?), style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.6))),
+            ]),
+          ),
+          Text('${amount > 0 ? '+' : ''}$amount', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        ]),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) {
-          final theme = Theme.of(context);
           final lv = levelInfo();
           final next = lv['next'] as int?;
           final progress = next == null ? 1.0 : (((lv['visits'] as int) - (lv['from'] as int)) / (next - (lv['from'] as int))).clamp(0.0, 1.0).toDouble();
@@ -255,177 +477,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           final favs = store.shops.where((s) => store.favs.contains('${s['id']}')).toList();
           final acts = store.txs.where((t) => t['undone'] != true).take(4).toList();
           final ready = store.rewardsReady;
+          final divider = Divider(height: 28, color: Theme.of(context).colorScheme.outlineVariant);
           return RefreshIndicator(
             onRefresh: store.refresh,
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
-              FadeSlideIn(
-                child: Row(children: [
-                  Pressable(
-                    onTap: () => widget.goTo(4),
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [lv['color'] as Color, Colors.white, lv['color'] as Color])),
-                      child: CircleAvatar(radius: 24, backgroundColor: avatarColors[store.avatarColor % avatarColors.length], child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_greeting(), style: theme.textTheme.bodyMedium),
-                      Text(store.name.isEmpty ? '…' : store.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                    ]),
-                  ),
-                  Pressable(
-                    onTap: () => Navigator.push(context, smoothRoute(const NotificationsPage())),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Badge(
-                        isLabelVisible: store.unread > 0,
-                        label: Text('${store.unread}'),
-                        child: AnimatedBuilder(
-                          animation: bell,
-                          builder: (_, child) => Transform.rotate(angle: store.unread > 0 && bell.value < 0.15 ? sin(bell.value / 0.15 * pi * 6) * 0.3 : 0, child: child),
-                          child: const NIcon('bell', size: 30),
-                        ),
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
+              FadeSlideIn(child: _header(lv)),
               const SizedBox(height: 16),
               FadeSlideIn(index: 1, child: _qrCard()),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               FadeSlideIn(
                 index: 2,
-                child: Row(children: [
-                  _action('wallet', tr('Portefeuille', 'المحفظة'), const [Color(0xFF0B5F50), Color(0xFF14B8A6)], () => widget.goTo(2)),
-                  _action('pin', tr('Carte', 'الخريطة'), const [Color(0xFF1D4ED8), Color(0xFF60A5FA)], () => widget.goTo(1)),
-                  _action('tag', tr('Offres', 'العروض'), const [Color(0xFFBE185D), Color(0xFFF472B6)], () => widget.goTo(3)),
-                  _action('history', tr('Historique', 'السجل'), const [Color(0xFF7C3AED), Color(0xFFA78BFA)], () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+                child: Column(children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _action('wallet', tr('Portefeuille', 'المحفظة'), () => widget.goTo(2)),
+                    _action('pin', tr('Carte', 'الخريطة'), () => widget.goTo(1)),
+                    _action('tag', tr('Offres', 'العروض'), () => widget.goTo(3)),
+                    _action('history', tr('Historique', 'السجل'), () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+                  ]),
+                  divider,
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _action('gift', tr('Récompenses', 'المكافآت'), () => widget.goTo(2)),
+                    _action('trophy', tr('Mon niveau', 'مستواي'), () => widget.goTo(4)),
+                    _action('help', tr('Aide', 'المساعدة'), () => Navigator.push(context, smoothRoute(const HelpPage()))),
+                    _action('user', tr('Profil', 'الملف'), () => widget.goTo(4)),
+                  ]),
                 ]),
               ),
               if (ready.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                FadeSlideIn(
-                  index: 3,
-                  child: Pressable(
-                    onTap: () => widget.goTo(2),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(colors: [Colors.amber.shade300, Colors.amber.shade600])),
-                      child: Row(children: [
-                        AnimatedBuilder(animation: pulse, builder: (_, __) => Transform.scale(scale: 1 + 0.15 * pulse.value, child: const NIcon('gift', size: 36, color: Colors.black87, accent: Colors.white))),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(tr('Une récompense vous attend !', 'مكافأة بانتظارك!'), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-                            Text('${ready.join(', ')} · ${tr('montrez votre code au commerçant', 'أظهر رمزك للتاجر')}', style: const TextStyle(color: Colors.black87, fontSize: 12)),
-                          ]),
-                        ),
-                        const NIcon('chevron', color: Colors.black54),
-                      ]),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 20),
+                FadeSlideIn(index: 3, child: _readyBanner(ready)),
               ],
-              const SizedBox(height: 18),
-              FadeSlideIn(
-                index: 4,
-                child: Row(children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const NIcon('coin', color: brandLight),
-                        AnimatedCount(store.total, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-                        Text('${tr('points', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', style: const TextStyle(fontSize: 12)),
-                      ]),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Pressable(
-                      onTap: () => widget.goTo(4),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          NIcon('trophy', size: 28, color: lv['color'] as Color),
-                          Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 6),
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: progress),
-                            duration: const Duration(milliseconds: 900),
-                            curve: Curves.easeOutCubic,
-                            builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 6, color: lv['color'] as Color)),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
               if (deals.isNotEmpty) ...[
-                _title(tr('Offres du moment', 'عروض الساعة'), more: () => widget.goTo(3)),
-                SizedBox(
-                  height: 96,
-                  child: ListView(scrollDirection: Axis.horizontal, children: [
-                    for (var i = 0; i < deals.length; i++)
-                      Pressable(
-                        onTap: () {
-                          final s = store.shops.where((x) => x['id'] == deals[i]['shop_id']).toList();
-                          if (s.isNotEmpty) _openShop(s.first);
-                        },
-                        child: Container(
-                          width: 230,
-                          margin: const EdgeInsetsDirectional.only(end: 10),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(colors: cardGrads[i % 4])),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Text('${deals[i]['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text('${(deals[i]['shops'] as Map?)?['name'] ?? ''}', style: const TextStyle(color: Colors.white70)),
-                          ]),
-                        ),
-                      ),
-                  ]),
-                ),
+                _title(tr('Meilleures offres', 'أفضل العروض'), more: () => widget.goTo(3)),
+                _offerBanners(deals),
               ],
-              _title(tr('Mes favoris', 'مفضلتي')),
-              if (favs.isEmpty)
-                Text(tr('Touchez l’étoile sur la fiche d’un commerce pour le retrouver ici.', 'المس النجمة في صفحة المتجر لتجده هنا.'), style: const TextStyle(color: Colors.grey))
-              else
-                SizedBox(
-                  height: 92,
-                  child: ListView(scrollDirection: Axis.horizontal, children: [
-                    for (final s in favs)
-                      Pressable(
-                        onTap: () => _openShop(s),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.only(end: 14),
-                          child: Column(children: [
-                            ShopLogo(shop: s, size: 58),
-                            const SizedBox(height: 4),
-                            SizedBox(width: 72, child: Text('${s['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11))),
-                          ]),
-                        ),
-                      ),
-                  ]),
-                ),
+              const SizedBox(height: 22),
+              FadeSlideIn(index: 4, child: _favsCard(favs)),
+              const SizedBox(height: 14),
+              FadeSlideIn(index: 5, child: _levelCard(lv, next, progress)),
               _title(tr('Activité récente', 'النشاط الأخير'), more: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
               if (acts.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(tr('Aucune visite pour le moment. Montrez votre QR chez un commerçant partenaire !', 'لا زيارات بعد. اعرض رمزك عند تاجر شريك!'), style: const TextStyle(color: Colors.grey))),
-              for (var i = 0; i < acts.length; i++)
-                FadeSlideIn(
-                  index: i,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(backgroundColor: acts[i]['type'] == 'reward' ? Colors.amber : Colors.green, child: NIcon(acts[i]['type'] == 'reward' ? 'gift' : 'add', color: Colors.white)),
-                    title: Text('${acts[i]['shop'] ?? ''}'),
-                    subtitle: Text(fmtDate(acts[i]['at'] as String?)),
-                    trailing: Text('${(acts[i]['amount'] as int) > 0 ? '+' : ''}${acts[i]['amount']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
+              for (var i = 0; i < acts.length; i++) FadeSlideIn(index: i, child: _activityTile(acts[i])),
             ]),
           );
         },
