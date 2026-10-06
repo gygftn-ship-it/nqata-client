@@ -87,6 +87,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   late final AnimationController pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
   late final AnimationController bell = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
 
+  // Bannières : toutes les images du dossier (bucket) Supabase Storage « banners », triées par nom
+  List<String> banners = [];
+  final bannerPc = PageController(viewportFraction: 0.92);
+  int bannerIdx = 0;
+  Timer? bannerTimer;
+  static const _imgExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+
+  Future<void> _loadBanners() async {
+    try {
+      final bucket = store.sb.storage.from('banners');
+      final files = await bucket.list();
+      final urls = [
+        for (final f in files)
+          if (_imgExt.any((e) => f.name.toLowerCase().endsWith(e))) bucket.getPublicUrl(f.name),
+      ];
+      if (!mounted) return;
+      setState(() { banners = urls; if (bannerIdx >= urls.length) bannerIdx = 0; });
+      _startBannerTimer();
+    } catch (_) {
+      // dossier absent ou hors connexion : le carrousel reste simplement masqué
+      if (mounted) setState(() => banners = []);
+    }
+  }
+
+  void _startBannerTimer() {
+    bannerTimer?.cancel();
+    if (banners.length < 2) return;
+    bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !bannerPc.hasClients || banners.length < 2) return;
+      bannerPc.animateToPage((bannerIdx + 1) % banners.length, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+    });
+  }
+
   Future<void> _token() async {
     try {
       final t = await store.sb.rpc('new_qr_token') as String;
@@ -108,6 +141,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable(); // l'écran reste allumé pendant que le commerçant scanne
     _restart();
+    _loadBanners();
   }
 
   // Au retour dans l'app, l'ancien QR est expiré : on en demande un neuf tout de suite.
@@ -123,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     timer?.cancel();
     pulse.dispose();
     bell.dispose();
+    bannerTimer?.cancel();
+    bannerPc.dispose();
     tokenN.dispose();
     super.dispose();
   }
@@ -281,23 +317,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         ),
       );
 
-  /// Icône ronde sur fond jaune pâle + libellé (comme la grille de services du modèle).
-  Widget _action(String icon, String label, VoidCallback onTap) => Expanded(
-        child: Pressable(
-          onTap: onTap,
-          child: Column(children: [
-            Container(
-              width: 66,
-              height: 66,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: _tint),
-              child: NIcon(icon, size: 30, color: _ink, accent: _gold),
+  /// Carrousel de bannières (images du dossier Supabase), défilement automatique + points.
+  Widget _bannerCarousel() => Column(children: [
+        AspectRatio(
+          aspectRatio: 2.1,
+          child: PageView.builder(
+            controller: bannerPc,
+            itemCount: banners.length,
+            onPageChanged: (i) => setState(() => bannerIdx = i),
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.network(
+                  banners[i],
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  loadingBuilder: (_, child, p) => p == null ? child : Container(color: _tint),
+                  errorBuilder: (_, __, ___) => Container(color: _tint, alignment: Alignment.center, child: NIcon('tag', size: 40, color: _ink.withOpacity(0.4), accent: _gold)),
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.2)),
-          ]),
+          ),
         ),
-      );
+        if (banners.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              for (var i = 0; i < banners.length; i++)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: i == bannerIdx ? 20 : 7,
+                  height: 7,
+                  decoration: BoxDecoration(color: i == bannerIdx ? _gold : _ink.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                ),
+            ]),
+          ),
+      ]);
 
   Widget _readyBanner(List<String> ready) => Pressable(
         onTap: () => widget.goTo(2),
@@ -477,32 +535,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           final favs = store.shops.where((s) => store.favs.contains('${s['id']}')).toList();
           final acts = store.txs.where((t) => t['undone'] != true).take(4).toList();
           final ready = store.rewardsReady;
-          final divider = Divider(height: 28, color: Theme.of(context).colorScheme.outlineVariant);
           return RefreshIndicator(
-            onRefresh: store.refresh,
+            onRefresh: () async { await store.refresh(); await _loadBanners(); },
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
               FadeSlideIn(child: _header(lv)),
               const SizedBox(height: 16),
               FadeSlideIn(index: 1, child: _qrCard()),
-              const SizedBox(height: 22),
-              FadeSlideIn(
-                index: 2,
-                child: Column(children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _action('wallet', tr('Portefeuille', 'المحفظة'), () => widget.goTo(2)),
-                    _action('pin', tr('Carte', 'الخريطة'), () => widget.goTo(1)),
-                    _action('tag', tr('Offres', 'العروض'), () => widget.goTo(3)),
-                    _action('history', tr('Historique', 'السجل'), () => Navigator.push(context, smoothRoute(const HistoryPage()))),
-                  ]),
-                  divider,
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _action('gift', tr('Récompenses', 'المكافآت'), () => widget.goTo(2)),
-                    _action('trophy', tr('Mon niveau', 'مستواي'), () => widget.goTo(4)),
-                    _action('help', tr('Aide', 'المساعدة'), () => Navigator.push(context, smoothRoute(const HelpPage()))),
-                    _action('user', tr('Profil', 'الملف'), () => widget.goTo(4)),
-                  ]),
-                ]),
-              ),
+              if (banners.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                FadeSlideIn(index: 2, child: _bannerCarousel()),
+              ],
               if (ready.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 FadeSlideIn(index: 3, child: _readyBanner(ready)),
