@@ -32,6 +32,8 @@ flutter:
     - mascot_hero.jpg
     - coin.png
     - robot.png
+    - notif_none.png
+    - notif_new.png
 
 flutter_launcher_icons:
   android: true
