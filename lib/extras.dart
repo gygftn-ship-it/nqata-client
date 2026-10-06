@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
-import 'mascot.dart';
 import 'tabs.dart';
 
 // ---------- Historique complet : visites et récompenses utilisées ----------
@@ -138,7 +137,7 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
           child: ScaleTransition(
             scale: CurvedAnimation(parent: c, curve: const Interval(0, 0.3, curve: Curves.elasticOut)),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-LivingMascot(size: 100, bubble: false, message: ''),
+const NIcon('gift', size: 88, color: Colors.white, accent: brandYellow),
               const SizedBox(height: 8),
               Text(tr('Récompense débloquée !', 'تم فتح مكافأة!'), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
               if (widget.shop.isNotEmpty) Text(widget.shop, style: const TextStyle(color: Colors.white70, fontSize: 18)),
