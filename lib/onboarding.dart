@@ -16,9 +16,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
   int page = 0;
 
   static const slides = [
-    ('qr', 'Une seule carte pour tous vos commerces', 'بطاقة واحدة لكل محلاتك', 'Présentez votre QR et gagnez des points à chaque visite.', 'اعرض رمزك واكسب نقاطًا في كل زيارة.'),
-    ('gift', 'Des récompenses qui vous attendent', 'مكافآت بانتظارك', 'Suivez vos points commerce par commerce et débloquez des cadeaux.', 'تابع نقاطك في كل متجر واكسب هدايا.'),
-    ('pin', 'Offres et commerces près de vous', 'عروض ومحلات قريبة منك', 'Trouvez les commerces partenaires et profitez des bons plans.', 'اكتشف المحلات الشريكة واستفد من العروض.'),
+    ('Salut, moi c\'est Nqo !', 'أهلًا، أنا نقو!', 'Je vais vous montrer comment gagner des points chez vos commerces préférés.', 'سأريكم كيف تكسبون نقاطًا عند متاجركم المفضلة.'),
+    ('Votre QR, c\'est votre carte', 'رمزكم هو بطاقتكم', 'Ouvrez l\'app chez un commerçant et montrez votre QR : il scanne, vous gagnez des points.', 'افتحوا التطبيق عند التاجر وأظهروا رمزكم: يمسحه، وتكسبون نقاطًا.'),
+    ('Les récompenses, c\'est pour vous !', 'المكافآت من أجلكم!', 'Chaque commerce a son propre programme. Quand la jauge se remplit, une récompense vous attend.', 'لكل متجر برنامجه الخاص. عندما يمتلئ المؤشر، تنتظركم مكافأة.'),
   ];
 
   @override
