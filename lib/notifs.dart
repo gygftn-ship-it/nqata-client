@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'nicons.dart';
 import 'main.dart';
-import 'mascot.dart';
 import 'shop.dart';
 import 'tabs.dart';
 
@@ -84,7 +83,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             duration: const Duration(milliseconds: 900),
                             curve: Curves.elasticOut,
                             builder: (_, v, child) => Transform.scale(scale: v, child: child),
-                            child: LivingMascot(size: 130, message: tr('Rien pour le moment', 'لا شيء حاليًا')),
+                            child: const NIcon('bell_off', size: 72, color: Colors.grey),
                           ),
                           const SizedBox(height: 12),
                           Text(tr('Rien pour le moment', 'لا شيء حاليًا'), style: theme.textTheme.titleMedium),
