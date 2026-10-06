@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'extras.dart';
-import 'mascot.dart';
 import 'main.dart';
 import 'notifs.dart';
 import 'profile.dart';
@@ -256,10 +255,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           final favs = store.shops.where((s) => store.favs.contains('${s['id']}')).toList();
           final acts = store.txs.where((t) => t['undone'] != true).take(4).toList();
           final ready = store.rewardsReady;
-          return Stack(children: [
-            RefreshIndicator(
-              onRefresh: store.refresh,
-              child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 100), children: [
+          return RefreshIndicator(
+            onRefresh: store.refresh,
+            child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
               FadeSlideIn(
                 child: Row(children: [
                   Pressable(
@@ -331,19 +329,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 ),
               ],
               const SizedBox(height: 18),
-              if (store.streakWeeks > 0)
-                FadeSlideIn(
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(16)),
-                    child: Row(children: [
-                      const NIcon('bolt', color: Colors.orange),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(tr('${store.streakWeeks} semaine(s) de suite avec une visite !', '${store.streakWeeks} أسبوع متتالٍ بزيارة!'), style: const TextStyle(fontWeight: FontWeight.w600))),
-                    ]),
-                  ),
-                ),
               FadeSlideIn(
                 index: 4,
                 child: Row(children: [
@@ -442,9 +427,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   ),
                 ),
             ]),
-            ),
-            const PositionedDirectional(end: 16, bottom: 8, child: MascotPeek()),
-          ]);
+          );
         },
       );
 }
