@@ -6,8 +6,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'extras.dart';
 import 'main.dart';
-import 'leaderboard.dart';
-import 'onboarding.dart';
 import 'referral.dart';
 import 'policy.dart';
 import 'tabs.dart';
@@ -227,8 +225,6 @@ class SettingsTab extends StatelessWidget {
         Row(children: [
           _stat(store.total, tr('Points', 'نقاط')),
           const SizedBox(width: 10),
-          _stat(store.streakWeeks, tr('Semaines de suite', 'أسابيع متتالية')),
-          const SizedBox(width: 10),
           _stat(store.wallet.length, tr('Commerces', 'متاجر')),
           const SizedBox(width: 10),
           _stat(store.rewardsReady.length, tr('Récompenses', 'مكافآت')),
@@ -372,8 +368,6 @@ class SettingsTab extends StatelessWidget {
           _section(context, 5, tr('Aide', 'المساعدة'), [
             _tile('history', Colors.purple, tr('Historique complet', 'السجل الكامل'), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
             _tile('gift', Colors.pink, tr('Parrainage', 'الترشيح'), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
-            _tile('trophy', Colors.orange, tr('Classement entre amis', 'الترتيب بين الأصدقاء'), onTap: () => Navigator.push(context, smoothRoute(const LeaderboardPage()))),
-            _tile('qr_scan', Colors.indigo, tr('Revoir le tutoriel', 'إعادة مشاهدة الشرح'), subtitle: tr('Les 3 écrans de présentation', 'شاشات العرض الثلاث'), onTap: () => Navigator.push(context, smoothRoute(const OnboardingPage(replay: true)))),
             _tile('help', Colors.green, tr('Aide et questions fréquentes', 'المساعدة والأسئلة الشائعة'), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
             _tile('support', Colors.blue, tr('Contacter le support', 'اتصل بالدعم'), subtitle: supportEmail, onTap: () => _contactSupport(context)),
           ]),
