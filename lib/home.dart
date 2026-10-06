@@ -12,7 +12,7 @@ import 'profile.dart';
 import 'shop.dart';
 import 'tabs.dart';
 
-/// Effet « pressé » : la carte rétrécit sous le doigt, avec une petite vibration.
+/// Effet « pressé » : l'élément rétrécit légèrement sous le doigt, avec une petite vibration.
 class Pressable extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -29,7 +29,7 @@ class _PressableState extends State<Pressable> {
         onTapDown: (_) => setState(() => down = true),
         onTapUp: (_) { setState(() => down = false); HapticFeedback.selectionClick(); widget.onTap?.call(); },
         onTapCancel: () => setState(() => down = false),
-        child: AnimatedScale(scale: down ? 0.94 : 1, duration: const Duration(milliseconds: 120), curve: Curves.easeOut, child: widget.child),
+        child: AnimatedScale(scale: down ? 0.97 : 1, duration: const Duration(milliseconds: 100), curve: Curves.easeOut, child: widget.child),
       );
 }
 
@@ -41,8 +41,8 @@ class _RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final r = Rect.fromLTWH(6, 6, size.width - 12, size.height - 12);
-    final trackPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..color = track;
-    final arcPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 6..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.redAccent : arc;
+    final trackPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 4..color = track;
+    final arcPaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round..color = t < 0.18 ? Colors.redAccent : arc;
     canvas.drawArc(r, 0, 2 * pi, false, trackPaint);
     canvas.drawArc(r, -pi / 2, 2 * pi * t, false, arcPaint);
   }
@@ -80,18 +80,17 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final tokenN = ValueNotifier<String>('');
   String? qrError;
   Timer? timer;
-  late final AnimationController pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
-  late final AnimationController bell = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
 
   // Bannières : toutes les images du dossier (bucket) Supabase Storage « banners », triées par nom
   List<String> banners = [];
   final bannerPc = PageController(viewportFraction: 0.92);
   int bannerIdx = 0;
   Timer? bannerTimer;
+  bool bannersLoading = true;
   static const _imgExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 
   Future<void> _loadBanners() async {
@@ -103,11 +102,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           if (_imgExt.any((e) => f.name.toLowerCase().endsWith(e))) bucket.getPublicUrl(f.name),
       ];
       if (!mounted) return;
-      setState(() { banners = urls; if (bannerIdx >= urls.length) bannerIdx = 0; });
+      setState(() { banners = urls; bannersLoading = false; if (bannerIdx >= urls.length) bannerIdx = 0; });
       _startBannerTimer();
     } catch (_) {
       // dossier absent ou hors connexion : le carrousel reste simplement masqué
-      if (mounted) setState(() => banners = []);
+      if (mounted) setState(() { banners = []; bannersLoading = false; });
     }
   }
 
@@ -155,19 +154,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
     WidgetsBinding.instance.removeObserver(this);
     WakelockPlus.disable();
     timer?.cancel();
-    pulse.dispose();
-    bell.dispose();
     bannerTimer?.cancel();
     bannerPc.dispose();
     tokenN.dispose();
     super.dispose();
   }
 
-  // ---------- Couleurs du thème ----------
+  // ---------- Couleurs et style (sobre, clair) ----------
   bool get _dark => Theme.of(context).brightness == Brightness.dark;
-  Color get _tint => brandYellow.withOpacity(_dark ? 0.12 : 0.22); // fond « jaune pâle » des cartes
   Color get _ink => Theme.of(context).colorScheme.onSurface;
-  Color get _gold => _dark ? brandYellow : brandLight; // accent lisible sur fond pâle ou sombre
+  Color get _card => _dark ? const Color(0xFF181611) : Colors.white;
+  Color get _line => _ink.withOpacity(_dark ? 0.14 : 0.10); // filets et contours fins
+  Color get _muted => _ink.withOpacity(0.62);
+  Color get _gold => _dark ? brandYellow : brandLight; // accent des icônes
+  Color get _link => _dark ? brandYellow : const Color(0xFF8A6500); // texte cliquable : contraste suffisant sur blanc
+  bool get _ar => lang == 'ar';
+  String _caps(String t) => _ar ? t : t.toUpperCase(); // pas de majuscules ni d'espacement en arabe (casse la liaison des lettres)
+  double get _ls => _ar ? 0 : 1.2;
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -177,15 +180,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
   void _openShop(Map<String, dynamic> s) => Navigator.push(context, smoothRoute(ShopPage(shop: s)));
 
   // ---------- Morceaux d'interface ----------
+  /// Carte sobre : fond blanc, contour fin, petits arrondis.
+  Widget _box({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.all(16), double? width}) => Container(
+        width: width,
+        padding: padding,
+        decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: _line)),
+        child: child,
+      );
+
+  /// Titre de section : texte net en gras, comme les grandes apps de service.
   Widget _title(String t, {VoidCallback? more}) => Padding(
-        padding: const EdgeInsets.only(top: 26, bottom: 12),
+        padding: const EdgeInsets.only(top: 28, bottom: 12),
         child: Row(children: [
-          Expanded(child: Text(t, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2))),
-          if (more != null) TextButton(onPressed: more, child: Text(tr('Voir tout', 'عرض الكل'))),
+          Expanded(child: Text(t, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: _ar ? 0 : -0.2))),
+          if (more != null)
+            InkWell(
+              onTap: more,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(tr('Voir tout', 'عرض الكل'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _link)),
+                  const SizedBox(width: 2),
+                  NIcon('chevron', size: 16, color: _link, accent: _link),
+                ]),
+              ),
+            ),
         ]),
       );
 
-  /// Cloche mascotte : une image quand il y a des notifications non lues, une autre sinon.
+  /// Mascotte-cloche : une image quand il y a des notifications non lues, une autre sinon.
   Widget _bell() {
     final has = store.unread > 0;
     return Semantics(
@@ -193,13 +217,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
       label: tr('Notifications', 'الإشعارات'),
       child: Pressable(
         onTap: () => Navigator.push(context, smoothRoute(const NotificationsPage())),
-        child: AnimatedBuilder(
-          animation: bell,
-          builder: (_, child) => Transform.rotate(angle: has && bell.value < 0.15 ? sin(bell.value / 0.15 * pi * 6) * 0.2 : 0, child: child),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Image.asset(has ? 'notif_new.png' : 'notif_none.png', key: ValueKey(has), width: 56, height: 56),
-          ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Image.asset(has ? 'notif_new.png' : 'notif_none.png', key: ValueKey(has), width: 48, height: 48),
         ),
       ),
     );
@@ -209,45 +229,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
         Pressable(
           onTap: () => widget.goTo(4),
           child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [lv['color'] as Color, Colors.white, lv['color'] as Color])),
-            child: CircleAvatar(radius: 24, backgroundColor: avatarColors[store.avatarColor % avatarColors.length], child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: lv['color'] as Color, width: 2)),
+            child: CircleAvatar(radius: 22, backgroundColor: avatarColors[store.avatarColor % avatarColors.length], child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600))),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_greeting(), style: Theme.of(context).textTheme.bodyMedium),
-            Text(store.name.isEmpty ? '…' : store.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+            Text(_greeting(), style: TextStyle(fontSize: 13, color: _muted)),
+            Text(store.name.isEmpty ? '…' : store.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
           ]),
         ),
         _bell(),
       ]);
 
-  /// Grande carte du haut : solde de points + QR qui se renouvelle + code client.
+  /// Carte d'accès (encre noire) : solde de points + QR qui se renouvelle + code client.
   Widget _qrCard() => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 12, 18),
-        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(28)),
+        padding: const EdgeInsets.fromLTRB(20, 16, 12, 20),
+        decoration: BoxDecoration(color: brandDark, borderRadius: BorderRadius.circular(20), border: _dark ? Border.all(color: Colors.white12) : null),
         child: ValueListenableBuilder<String>(
           valueListenable: tokenN,
           builder: (_, token, __) => Column(children: [
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('Mes points', 'نقاطي'), style: TextStyle(color: _gold, fontWeight: FontWeight.w800, fontSize: 14)),
-                  const SizedBox(height: 2),
+                  Text(_caps(tr('Mes points', 'نقاطي')), style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: _ls)),
+                  const SizedBox(height: 4),
                   Row(children: [
-                    Image.asset('coin.png', width: 30, height: 30),
+                    Image.asset('coin.png', width: 24, height: 24),
                     const SizedBox(width: 8),
-                    AnimatedCount(store.total, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, height: 1.1)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('${tr('pts', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.65)))),
+                    AnimatedCount(store.total, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700, height: 1.1)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text('${tr('pts', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.white54))),
                   ]),
                 ]),
               ),
-              IconButton(icon: NIcon('refresh', color: _ink.withOpacity(0.7), accent: _gold), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
+              IconButton(icon: const NIcon('refresh', color: Colors.white70, accent: brandYellow), tooltip: tr('Renouveler', 'تجديد'), onPressed: _restart),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             GestureDetector(
               onTap: token.isEmpty ? null : () { HapticFeedback.mediumImpact(); Navigator.push(context, smoothRoute(_QrFull(token: tokenN))); },
               child: SizedBox(
@@ -258,14 +278,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                     key: ValueKey(token),
                     tween: Tween(begin: 1, end: 0),
                     duration: const Duration(seconds: rotationSeconds),
-                    builder: (_, v, __) => CustomPaint(size: const Size(252, 252), painter: _RingPainter(token.isEmpty ? 0 : v, track: _ink.withOpacity(0.10), arc: _gold)),
+                    builder: (_, v, __) => CustomPaint(size: const Size(252, 252), painter: _RingPainter(token.isEmpty ? 0 : v, track: Colors.white12, arc: brandYellow)),
                   ),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12, offset: Offset(0, 4))]),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 450),
-                      transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.92, end: 1.0).animate(a), child: c)),
+                      transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.96, end: 1.0).animate(a), child: c)),
                       child: token.isNotEmpty
                           ? QrImageView(key: ValueKey(token), data: token, size: 196)
                           : qrError != null
@@ -286,8 +306,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 ]),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(tr('Touchez le QR pour l\'agrandir · renouvelé toutes les 45 s', 'المس الرمز لتكبيره · يتجدد كل 45 ثانية'), textAlign: TextAlign.center, style: TextStyle(color: _ink.withOpacity(0.6), fontSize: 11)),
+            const SizedBox(height: 6),
+            Text(tr('Touchez le QR pour l\'agrandir · renouvelé toutes les 45 s', 'المس الرمز لتكبيره · يتجدد كل 45 ثانية'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            const SizedBox(height: 14),
+            const Padding(padding: EdgeInsetsDirectional.only(end: 8), child: Divider(height: 1, color: Colors.white12)),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
@@ -297,23 +319,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                   Clipboard.setData(ClipboardData(text: store.code));
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Code copié', 'تم نسخ الرمز'))));
                 },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                  decoration: BoxDecoration(color: brandDark, borderRadius: BorderRadius.circular(18)),
-                  child: Column(children: [
-                    Text(tr('Mon code client · à donner si le scan ne marche pas', 'رمز الزبون · أعطه إن لم ينجح المسح'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                    const SizedBox(height: 2),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: brandYellow, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 6, fontFamily: 'monospace')),
-                      const SizedBox(width: 10),
-                      const NIcon('copy', color: Colors.white70, size: 18),
-                    ]),
+                child: Column(children: [
+                  Text(tr('Mon code client · à donner si le scan ne marche pas', 'رمز الزبون · أعطه إن لم ينجح المسح'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(store.code.isEmpty ? '······' : store.code, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600, letterSpacing: 6, fontFamily: 'monospace')),
+                    const SizedBox(width: 10),
+                    const NIcon('copy', color: Colors.white54, size: 18),
                   ]),
-                ),
+                ]),
               ),
             ),
           ]),
+        ),
+      );
+
+  Widget _bannerSkeleton() => AspectRatio(
+        aspectRatio: 2.1,
+        child: Center(
+          child: FractionallySizedBox(
+            widthFactor: 0.92,
+            heightFactor: 1,
+            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Container(decoration: BoxDecoration(color: _line, borderRadius: BorderRadius.circular(16)))),
+          ),
         ),
       );
 
@@ -328,14 +356,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
             itemBuilder: (_, i) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.network(
-                  banners[i],
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                  loadingBuilder: (_, child, p) => p == null ? child : Container(color: _tint),
-                  errorBuilder: (_, __, ___) => Container(color: _tint, alignment: Alignment.center, child: NIcon('tag', size: 40, color: _ink.withOpacity(0.4), accent: _gold)),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  color: _line,
+                  child: Image.network(
+                    banners[i],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    gaplessPlayback: true,
+                    frameBuilder: (_, child, frame, sync) => sync ? child : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: const Duration(milliseconds: 350), curve: Curves.easeOut, child: child),
+                    errorBuilder: (_, __, ___) => Container(alignment: Alignment.center, child: NIcon('tag', size: 36, color: _muted, accent: _gold)),
+                  ),
                 ),
               ),
             ),
@@ -349,178 +381,165 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: i == bannerIdx ? 20 : 7,
-                  height: 7,
-                  decoration: BoxDecoration(color: i == bannerIdx ? _gold : _ink.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                  width: i == bannerIdx ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: i == bannerIdx ? _ink : _ink.withOpacity(0.2), borderRadius: BorderRadius.circular(3)),
                 ),
             ]),
           ),
       ]);
 
+  /// Récompense disponible : carte sobre avec un filet jaune sur le côté.
   Widget _readyBanner(List<String> ready) => Pressable(
         onTap: () => widget.goTo(2),
         child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: [Colors.amber.shade300, Colors.amber.shade600])),
-          child: Row(children: [
-            AnimatedBuilder(animation: pulse, builder: (_, __) => Transform.scale(scale: 1 + 0.15 * pulse.value, child: const NIcon('gift', size: 40, color: Colors.black87, accent: Colors.white))),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tr('Une récompense vous attend !', 'مكافأة بانتظارك!'), style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text('${ready.join(', ')} · ${tr('montrez votre code au commerçant', 'أظهر رمزك للتاجر')}', style: const TextStyle(color: Colors.black87, fontSize: 12)),
-              ]),
-            ),
-            const NIcon('chevron', color: Colors.black54),
-          ]),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: _line)),
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Container(width: 4, color: brandYellow),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(children: [
+                    NIcon('gift', size: 28, color: _ink, accent: _gold),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(tr('Une récompense vous attend', 'مكافأة بانتظارك'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text('${ready.join(', ')} · ${tr('montrez votre code au commerçant', 'أظهر رمزك للتاجر')}', style: TextStyle(fontSize: 12, color: _muted)),
+                      ]),
+                    ),
+                    NIcon('chevron', color: _muted, accent: _muted),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
         ),
       );
 
-  /// Bannières d'offres (défilement horizontal).
-  Widget _offerBanners(List<Map<String, dynamic>> deals) => SizedBox(
-        height: 150,
+  /// Offres en cours : cartes sobres en défilement horizontal.
+  Widget _offerCards(List<Map<String, dynamic>> deals) => SizedBox(
+        height: 120,
         child: ListView(scrollDirection: Axis.horizontal, children: [
-          for (var i = 0; i < deals.length; i++)
-            Pressable(
-              onTap: () {
-                final s = store.shops.where((x) => x['id'] == deals[i]['shop_id']).toList();
-                if (s.isNotEmpty) _openShop(s.first);
-              },
-              child: Container(
-                width: 270,
-                margin: const EdgeInsetsDirectional.only(end: 12),
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: cardGrads[i % cardGrads.length])),
-                child: Stack(children: [
-                  PositionedDirectional(end: -16, bottom: -16, child: NIcon('tag', size: 120, color: Colors.white.withOpacity(0.14), accent: Colors.white.withOpacity(0.14))),
-                  Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: brandYellow, borderRadius: BorderRadius.circular(20)),
-                        child: Text('${(deals[i]['shops'] as Map?)?['name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 11)),
-                      ),
-                      Text('${deals[i]['title']}', maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, height: 1.15)),
+          for (final d in deals)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 12),
+              child: Pressable(
+                onTap: () {
+                  final s = store.shops.where((x) => x['id'] == d['shop_id']).toList();
+                  if (s.isNotEmpty) _openShop(s.first);
+                },
+                child: _box(
+                  width: 250,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Row(children: [
+                      NIcon('tag', size: 16, color: _ink, accent: _gold),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('${(d['shops'] as Map?)?['name'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _muted))),
                     ]),
-                  ),
-                ]),
+                    Text('${d['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, height: 1.25)),
+                  ]),
+                ),
               ),
             ),
         ]),
       );
 
-  /// Favoris : pastilles rondes avec anneau doré (comme les « stories » du modèle).
-  Widget _favsCard(List<Map<String, dynamic>> favs) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(24)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            NIcon('star', size: 24, color: _ink, accent: _gold),
-            const SizedBox(width: 8),
-            Text(tr('Mes favoris', 'مفضلتي'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 12),
-          if (favs.isEmpty)
-            Text(tr('Touchez l’étoile sur la fiche d’un commerce pour le retrouver ici.', 'المس النجمة في صفحة المتجر لتجده هنا.'), style: TextStyle(color: _ink.withOpacity(0.6)))
-          else
-            SizedBox(
-              height: 96,
-              child: ListView(scrollDirection: Axis.horizontal, children: [
-                for (final s in favs)
-                  Pressable(
-                    onTap: () => _openShop(s),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 14),
-                      child: Column(children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [brandYellow, brandLight, brandYellow])),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.surface),
-                            child: ClipOval(child: ShopLogo(shop: s, size: 54)),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        SizedBox(width: 68, child: Text('${s['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600))),
-                      ]),
-                    ),
-                  ),
-              ]),
-            ),
+  /// Favoris : logos ronds avec un contour fin.
+  Widget _favsRow(List<Map<String, dynamic>> favs) {
+    if (favs.isEmpty) {
+      return _box(
+        child: Row(children: [
+          NIcon('star', size: 26, color: _ink, accent: _gold),
+          const SizedBox(width: 14),
+          Expanded(child: Text(tr('Touchez l’étoile sur la fiche d’un commerce pour le retrouver ici.', 'المس النجمة في صفحة المتجر لتجده هنا.'), style: TextStyle(color: _muted, fontSize: 13, height: 1.35))),
         ]),
       );
+    }
+    return SizedBox(
+      height: 92,
+      child: ListView(scrollDirection: Axis.horizontal, children: [
+        for (final s in favs)
+          Pressable(
+            onTap: () => _openShop(s),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(end: 16),
+              child: Column(children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _line, width: 1.5)),
+                  child: ClipOval(child: ShopLogo(shop: s, size: 54)),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(width: 68, child: Text('${s['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
 
-  /// Carte « niveau fidélité » (comme la bannière Yassir Plus du modèle).
+  /// Niveau fidélité : carte sobre avec barre de progression fine.
   Widget _levelCard(Map<String, dynamic> lv, int? next, double progress) {
     final c = lv['color'] as Color;
     return Pressable(
       onTap: () => widget.goTo(4),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(24)),
+      child: _box(
         child: Row(children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: c.withOpacity(0.18)),
-            child: NIcon('trophy', size: 34, color: c),
-          ),
+          NIcon('trophy', size: 30, color: c),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr('Votre niveau fidélité', 'مستوى ولائك'), style: TextStyle(color: _gold, fontWeight: FontWeight.w700, fontSize: 12)),
-              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
               const SizedBox(height: 8),
               TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: progress),
                 duration: const Duration(milliseconds: 900),
                 curve: Curves.easeOutCubic,
-                builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 7, color: c, backgroundColor: _ink.withOpacity(0.10))),
+                builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: v, minHeight: 4, color: c, backgroundColor: _ink.withOpacity(0.10))),
               ),
               const SizedBox(height: 6),
               Text(
                 next == null ? tr('Niveau maximum atteint', 'وصلت لأعلى مستوى') : '${next - (lv['visits'] as int)} ${tr('visites avant le prochain niveau', 'زيارة للمستوى التالي')}',
-                style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.7)),
+                style: TextStyle(fontSize: 12, color: _muted),
               ),
             ]),
           ),
           const SizedBox(width: 8),
-          NIcon('chevron', color: _ink, accent: _gold),
+          NIcon('chevron', color: _muted, accent: _muted),
         ]),
       ),
     );
   }
 
+  /// Ligne d'activité : liste simple, séparée par des filets.
   Widget _activityTile(Map<String, dynamic> a) {
     final reward = a['type'] == 'reward';
     final amount = a['amount'] as int;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(20)),
-        child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: reward ? brandYellow : Theme.of(context).colorScheme.surface),
-            child: NIcon(reward ? 'gift' : 'add', size: 22, color: reward ? Colors.black87 : _ink, accent: reward ? Colors.white : _gold),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${a['shop'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-              Text(fmtDate(a['at'] as String?), style: TextStyle(fontSize: 12, color: _ink.withOpacity(0.6))),
-            ]),
-          ),
-          Text('${amount > 0 ? '+' : ''}$amount', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-        ]),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _line, width: 1.5)),
+          child: NIcon(reward ? 'gift' : 'add', size: 20, color: _ink, accent: _gold),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${a['shop'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+            Text(fmtDate(a['at'] as String?), style: TextStyle(fontSize: 12, color: _muted)),
+          ]),
+        ),
+        Text('${amount > 0 ? '+' : ''}$amount', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+      ]),
     );
   }
 
@@ -536,30 +555,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver, Ti
           final acts = store.txs.where((t) => t['undone'] != true).take(4).toList();
           final ready = store.rewardsReady;
           return RefreshIndicator(
+            color: _ink,
+            backgroundColor: _card,
             onRefresh: () async { await store.refresh(); await _loadBanners(); },
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
               FadeSlideIn(child: _header(lv)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               FadeSlideIn(index: 1, child: _qrCard()),
-              if (banners.isNotEmpty) ...[
+              if (bannersLoading || banners.isNotEmpty) ...[
                 const SizedBox(height: 22),
-                FadeSlideIn(index: 2, child: _bannerCarousel()),
+                banners.isEmpty ? _bannerSkeleton() : FadeSlideIn(index: 2, child: _bannerCarousel()),
               ],
               if (ready.isNotEmpty) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 FadeSlideIn(index: 3, child: _readyBanner(ready)),
               ],
               if (deals.isNotEmpty) ...[
-                _title(tr('Meilleures offres', 'أفضل العروض'), more: () => widget.goTo(3)),
-                _offerBanners(deals),
+                _title(tr('Offres en cours', 'العروض الحالية'), more: () => widget.goTo(3)),
+                _offerCards(deals),
               ],
-              const SizedBox(height: 22),
-              FadeSlideIn(index: 4, child: _favsCard(favs)),
-              const SizedBox(height: 14),
-              FadeSlideIn(index: 5, child: _levelCard(lv, next, progress)),
+              _title(tr('Mes favoris', 'مفضلتي')),
+              _favsRow(favs),
+              _title(tr('Fidélité', 'الولاء')),
+              _levelCard(lv, next, progress),
               _title(tr('Activité récente', 'النشاط الأخير'), more: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
-              if (acts.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(tr('Aucune visite pour le moment. Montrez votre QR chez un commerçant partenaire !', 'لا زيارات بعد. اعرض رمزك عند تاجر شريك!'), style: const TextStyle(color: Colors.grey))),
-              for (var i = 0; i < acts.length; i++) FadeSlideIn(index: i, child: _activityTile(acts[i])),
+              if (acts.isEmpty)
+                _box(
+                  child: Row(children: [
+                    NIcon('history', size: 26, color: _ink, accent: _gold),
+                    const SizedBox(width: 14),
+                    Expanded(child: Text(tr('Aucune visite pour le moment. Montrez votre QR chez un commerçant partenaire !', 'لا زيارات بعد. اعرض رمزك عند تاجر شريك!'), style: TextStyle(color: _muted, fontSize: 13, height: 1.35))),
+                  ]),
+                ),
+              for (var i = 0; i < acts.length; i++) ...[
+                if (i > 0) Divider(height: 1, color: _line),
+                _activityTile(acts[i]),
+              ],
             ]),
           );
         },
