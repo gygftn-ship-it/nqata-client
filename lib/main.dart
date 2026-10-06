@@ -12,7 +12,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'discover.dart';
 import 'extras.dart';
 import 'map.dart';
-import 'onboarding.dart';
 import 'tabs.dart';
 import 'home.dart';
 import 'nav.dart';
@@ -54,13 +53,11 @@ class Store extends ChangeNotifier {
   String code = ''; // code client affiché sous le QR
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
   bool referredBy = false;
-  int streakWeeks = 0;
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
   Map<String, Map<String, dynamic>> ratings = {}; // note moyenne par commerce
   Map<String, int> myRatings = {}; // mes notes
-  bool onboarded = false;
   // Réglages
   ThemeMode themeMode = ThemeMode.system;
   double textScale = 1.0;
@@ -115,8 +112,6 @@ class Store extends ChangeNotifier {
       final p = await sb.from('profiles').select('display_name, referred_by').eq('id', uid).maybeSingle();
       name = (p?['display_name'] as String?) ?? '';
       referredBy = p?['referred_by'] != null;
-      streakWeeks = (p?['streak_weeks'] as int?) ?? 0;
-      try { streakWeeks = await sb.rpc('check_my_streak') as int; } catch (_) {}
     } catch (_) {
       offline = true;
       notifyListeners();
@@ -375,7 +370,6 @@ class Store extends ChangeNotifier {
 
   // ----- Parrainage -----
   Future<String> applyReferral(String code) async => await sb.rpc('apply_referral', params: {'p_code': code}) as String;
-  Future<List<Map<String, dynamic>>> friendLeaderboard() => _q(sb.rpc('friend_leaderboard'));
   Future<Map<String, dynamic>> referralStats() async {
     try {
       return Map<String, dynamic>.from(await sb.rpc('referral_stats') as Map);
@@ -398,12 +392,6 @@ class Store extends ChangeNotifier {
       was ? favs.add(id) : favs.remove(id);
       notifyListeners();
     }
-  }
-
-  void finishOnboarding() {
-    onboarded = true;
-    SharedPreferences.getInstance().then((p) => p.setBool('onboarded', true));
-    notifyListeners();
   }
 
   // Notifications reçues en direct (Supabase Realtime)
@@ -476,7 +464,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   lang = prefs.getString('lang') ?? 'fr';
-  store.onboarded = prefs.getBool('onboarded') ?? false;
   store.pinHash = prefs.getString('pin_hash');
   store.pinSalt = prefs.getString('pin_salt');
   store.themeMode = ThemeMode.values.firstWhere((m) => m.name == prefs.getString('theme'), orElse: () => ThemeMode.system);
@@ -507,7 +494,7 @@ class NqataClient extends StatelessWidget {
           themeMode: store.themeMode,
           scrollBehavior: const BouncyScroll(),
           builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(textScaler: TextScaler.linear(store.textScale)), child: Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!)),
-          home: !store.onboarded ? const OnboardingPage() : store.loggedIn ? const Shell() : const LoginPage(),
+          home: store.loggedIn ? const Shell() : const LoginPage(),
         ),
       );
 }
