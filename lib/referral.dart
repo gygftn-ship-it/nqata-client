@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
+import 'nicons.dart';
 import 'tabs.dart';
 
 /// Parrainage : inviter un ami, ou saisir le code de qui vous a invité.
