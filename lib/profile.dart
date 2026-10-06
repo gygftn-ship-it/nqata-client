@@ -1,25 +1,24 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'nicons.dart';
 import 'extras.dart';
+import 'home.dart'; // Pressable
 import 'main.dart';
-import 'referral.dart';
+import 'notifs.dart';
 import 'policy.dart';
+import 'referral.dart';
 import 'tabs.dart';
 import 'wallet.dart';
 
 const supportEmail = 'support@nqata.app'; // ← remplacez par votre vraie adresse de support
+const appVersion = '0.1.0';
 
 const avatarColors = [Color(0xFF15120B), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
 
-void _snack(BuildContext c, String m) {
-  if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
-}
-
-/// Niveau de fidélité selon le nombre de visites.
+/// Niveau de fidélité selon le nombre de visites (utilisé aussi par l'accueil).
 Map<String, dynamic> levelInfo() {
   final v = store.txs.where((t) => t['type'] == 'visit' && t['undone'] != true).length;
   if (v >= 20) return {'emoji': '🥇', 'name': tr('Or', 'ذهبي'), 'from': 20, 'next': null, 'next_name': '', 'color': const Color(0xFFF59E0B), 'visits': v};
@@ -27,375 +26,518 @@ Map<String, dynamic> levelInfo() {
   return {'emoji': '🥉', 'name': tr('Bronze', 'برونزي'), 'from': 0, 'next': 5, 'next_name': tr('Argent', 'الفضي'), 'color': const Color(0xFFCD7F32), 'visits': v};
 }
 
-class SettingsTab extends StatelessWidget {
-  const SettingsTab({super.key});
+// =====================================================================
+//  Style commun
+// =====================================================================
+const _hdrEnd = Color(0xFF2B2108); // bas du dégradé de l'en-tête (noir chaud → or foncé)
 
-  // ---------- Actions ----------
-  Future<void> _editProfile(BuildContext context) async {
-    final c = TextEditingController(text: store.name);
-    var color = store.avatarColor;
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheet) => StatefulBuilder(
-        builder: (_, set) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(sheet).viewInsets.bottom + 20),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tr('Modifier mon profil', 'تعديل ملفي'), style: Theme.of(sheet).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextField(controller: c, decoration: InputDecoration(labelText: tr('Prénom ou pseudo', 'الاسم'), border: const OutlineInputBorder())),
-            const SizedBox(height: 16),
-            Text(tr('Couleur de l\'avatar', 'لون الصورة الرمزية')),
-            const SizedBox(height: 10),
-            Wrap(spacing: 10, runSpacing: 10, children: [
-              for (var i = 0; i < avatarColors.length; i++)
-                GestureDetector(
-                  onTap: () { HapticFeedback.selectionClick(); set(() => color = i); },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(color: avatarColors[i], shape: BoxShape.circle, border: Border.all(color: color == i ? Colors.black87 : Colors.transparent, width: 3)),
-                    child: color == i ? const NIcon('check', color: Colors.white) : null,
-                  ),
-                ),
-            ]),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  final n = c.text.trim();
-                  try {
-                    if (n.isNotEmpty && n != store.name) await store.rename(n);
-                    store.setAvatarColor(color);
-                    if (sheet.mounted) Navigator.pop(sheet);
-                  } catch (e) {
-                    _snack(context, errText(e));
-                  }
-                },
-                child: Text(tr('Enregistrer', 'حفظ')),
-              ),
-            ),
-          ]),
+bool _isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
+Color _ink(BuildContext c) => Theme.of(c).colorScheme.onSurface;
+Color _line(BuildContext c) => _ink(c).withOpacity(_isDark(c) ? 0.14 : 0.10);
+Color _muted(BuildContext c) => _ink(c).withOpacity(0.62);
+Color _gold(BuildContext c) => _isDark(c) ? brandYellow : brandLight;
+Color _tint(BuildContext c) => _isDark(c) ? const Color(0xFF1B1912) : const Color(0xFFF6F3EA); // fond des tuiles et listes
+
+/// Groupe de lignes dans une carte teintée aux grands arrondis.
+Widget _group(BuildContext c, List<Widget> rows) => ListTileTheme(
+      data: ListTileThemeData(
+        titleTextStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _ink(c)),
+        subtitleTextStyle: TextStyle(fontSize: 12.5, color: _muted(c)),
+        minVerticalPadding: 14,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+      ),
+      child: Material(
+        color: _tint(c),
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(22),
+        child: Column(children: rows),
+      ),
+    );
+
+Widget _title(BuildContext c, String t) => Padding(
+      padding: const EdgeInsets.only(top: 26, bottom: 10, left: 4, right: 4),
+      child: Text(t, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: lang == 'ar' ? 0 : -0.2)),
+    );
+
+Widget _row(BuildContext c, String icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap, bool danger = false}) => ListTile(
+      onTap: onTap,
+      leading: NIcon(icon, size: 24, color: danger ? Colors.red : _ink(c), accent: danger ? Colors.red.shade200 : _gold(c)),
+      title: Text(title, style: danger ? const TextStyle(color: Colors.red) : null),
+      subtitle: subtitle == null ? null : Text(subtitle),
+      trailing: trailing ?? (onTap != null ? NIcon('chevron', size: 18, color: _ink(c), accent: _ink(c)) : null),
+    );
+
+Widget _switchRow(BuildContext c, String icon, String title, String subtitle, bool value, void Function(bool) onChanged, {bool enabled = true}) => _row(
+      c, icon, title,
+      subtitle: subtitle,
+      trailing: Switch(value: value && enabled, onChanged: enabled ? (v) { HapticFeedback.selectionClick(); onChanged(v); } : null),
+      onTap: enabled ? () { HapticFeedback.selectionClick(); onChanged(!value); } : null,
+    );
+
+Widget _choice(BuildContext c, String icon, String title, Widget control) => Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          NIcon(icon, size: 24, color: _ink(c), accent: _gold(c)),
+          const SizedBox(width: 16),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+        ]),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: control),
+      ]),
+    );
+
+/// Bouton rond (paramètres, retour). [onDark] : version claire pour l'en-tête sombre.
+Widget _roundBtn(BuildContext c, String icon, String label, VoidCallback onTap, {bool onDark = false}) => Semantics(
+      button: true,
+      label: label,
+      child: Pressable(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: onDark ? Colors.white.withOpacity(0.10) : _tint(c),
+            border: onDark ? Border.all(color: Colors.white24) : null,
+          ),
+          child: NIcon(icon, size: 22, color: onDark ? Colors.white : _ink(c), accent: onDark ? brandYellow : _gold(c)),
         ),
       ),
     );
-  }
 
-  Future<void> _changePassword(BuildContext context) async {
-    final a = TextEditingController(), b = TextEditingController();
-    final ok = await showDialog<bool>(
+// =====================================================================
+//  Actions partagées
+// =====================================================================
+void _snack(BuildContext c, String m) {
+  if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
+}
+
+Future<bool> _confirm(BuildContext context, String title, String body, String action, {bool danger = false}) async =>
+    await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: Text(tr('Changer le mot de passe', 'تغيير كلمة السر')),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: a, obscureText: true, decoration: InputDecoration(labelText: tr('Nouveau mot de passe (6 caractères min.)', 'كلمة السر الجديدة (6 أحرف على الأقل)'))),
-          const SizedBox(height: 10),
-          TextField(controller: b, obscureText: true, decoration: InputDecoration(labelText: tr('Confirmer', 'تأكيد'))),
-        ]),
+        title: Text(title),
+        content: Text(body),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(tr('Modifier', 'تغيير'))),
+          FilledButton(style: danger ? FilledButton.styleFrom(backgroundColor: Colors.red) : null, onPressed: () => Navigator.pop(d, true), child: Text(action)),
         ],
       ),
+    ) ==
+    true;
+
+void _info(BuildContext context, String title, String body) => showDialog(
+      context: context,
+      builder: (d) => AlertDialog(title: Text(title), content: SingleChildScrollView(child: Text(body)), actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))]),
     );
-    if (ok != true || !context.mounted) return;
-    if (a.text.length < 6 || a.text != b.text) {
-      _snack(context, tr('Les mots de passe ne correspondent pas, ou sont trop courts', 'كلمتا السر غير متطابقتين أو قصيرتان'));
-      return;
-    }
-    try {
-      await store.changePassword(a.text);
-      _snack(context, tr('Mot de passe modifié', 'تم تغيير كلمة السر'));
-    } catch (e) {
-      _snack(context, errText(e));
-    }
-  }
 
-  Future<bool> _confirm(BuildContext context, String title, String body, String action, {bool danger = false}) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (d) => AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
-            FilledButton(style: danger ? FilledButton.styleFrom(backgroundColor: Colors.red) : null, onPressed: () => Navigator.pop(d, true), child: Text(action)),
-          ],
-        ),
-      ) ==
-      true;
-
-  void _info(BuildContext context, String title, String body) => showDialog(
-        context: context,
-        builder: (d) => AlertDialog(title: Text(title), content: SingleChildScrollView(child: Text(body)), actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))]),
-      );
-
-  Future<void> _contactSupport(BuildContext context) async {
-    final uri = Uri(scheme: 'mailto', path: supportEmail, queryParameters: {'subject': 'Nqata – ${store.name}', 'body': '\n\n---\n${store.email} · ${store.code}'});
-    try {
-      if (await launchUrl(uri)) return;
-    } catch (_) {}
-    Clipboard.setData(ClipboardData(text: supportEmail));
-    if (context.mounted) _snack(context, tr('Aucune app e-mail trouvée : adresse copiée ($supportEmail)', 'لا يوجد تطبيق بريد: تم نسخ العنوان ($supportEmail)'));
-  }
-
-  void _export(BuildContext context) {
-    final data = {
-      'compte': {'nom': store.name, 'email': store.email, 'code_client': store.code},
-      'points_par_commerce': [for (final r in store.wallet) {'commerce': (r['shops'] as Map?)?['name'], 'points': r['points']}],
-      'transactions': store.txs,
-    };
-    Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(data)));
-    _snack(context, tr('Vos données ont été copiées : collez-les où vous voulez', 'تم نسخ بياناتك: الصقها حيث تريد'));
-  }
-
-  // ---------- Éléments de présentation ----------
-  Widget _stat(int v, String label) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.55), borderRadius: BorderRadius.circular(16)),
-          child: Column(children: [
-            AnimatedCount(v, style: const TextStyle(color: Colors.black87, fontSize: 22, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+Future<void> _editProfile(BuildContext context) async {
+  final c = TextEditingController(text: store.name);
+  var color = store.avatarColor;
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheet) => StatefulBuilder(
+      builder: (_, set) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(sheet).viewInsets.bottom + 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Informations personnelles', 'المعلومات الشخصية'), style: Theme.of(sheet).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          TextField(controller: c, decoration: InputDecoration(labelText: tr('Prénom ou pseudo', 'الاسم'), border: const OutlineInputBorder())),
+          const SizedBox(height: 16),
+          Text(tr('Couleur de l\'avatar', 'لون الصورة الرمزية')),
+          const SizedBox(height: 10),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            for (var i = 0; i < avatarColors.length; i++)
+              GestureDetector(
+                onTap: () { HapticFeedback.selectionClick(); set(() => color = i); },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: avatarColors[i], shape: BoxShape.circle, border: Border.all(color: color == i ? Colors.black87 : Colors.transparent, width: 3)),
+                  child: color == i ? const NIcon('check', color: Colors.white) : null,
+                ),
+              ),
           ]),
-        ),
-      );
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () async {
+                final n = c.text.trim();
+                try {
+                  if (n.isNotEmpty && n != store.name) await store.rename(n);
+                  store.setAvatarColor(color);
+                  if (sheet.mounted) Navigator.pop(sheet);
+                } catch (e) {
+                  _snack(context, errText(e));
+                }
+              },
+              child: Text(tr('Enregistrer', 'حفظ')),
+            ),
+          ),
+        ]),
+      ),
+    ),
+  );
+}
 
-  Widget _header(BuildContext context) {
-    final lv = levelInfo();
+Future<void> _changePassword(BuildContext context) async {
+  final a = TextEditingController(), b = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (d) => AlertDialog(
+      title: Text(tr('Changer le mot de passe', 'تغيير كلمة السر')),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: a, obscureText: true, decoration: InputDecoration(labelText: tr('Nouveau mot de passe (6 caractères min.)', 'كلمة السر الجديدة (6 أحرف على الأقل)'))),
+        const SizedBox(height: 10),
+        TextField(controller: b, obscureText: true, decoration: InputDecoration(labelText: tr('Confirmer', 'تأكيد'))),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
+        FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(tr('Modifier', 'تغيير'))),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  if (a.text.length < 6 || a.text != b.text) {
+    _snack(context, tr('Les mots de passe ne correspondent pas, ou sont trop courts', 'كلمتا السر غير متطابقتين أو قصيرتان'));
+    return;
+  }
+  try {
+    await store.changePassword(a.text);
+    _snack(context, tr('Mot de passe modifié', 'تم تغيير كلمة السر'));
+  } catch (e) {
+    _snack(context, errText(e));
+  }
+}
+
+Future<void> _contactSupport(BuildContext context) async {
+  final uri = Uri(scheme: 'mailto', path: supportEmail, queryParameters: {'subject': 'Nqata – ${store.name}', 'body': '\n\n---\n${store.email} · ${store.code}'});
+  try {
+    if (await launchUrl(uri)) return;
+  } catch (_) {}
+  Clipboard.setData(const ClipboardData(text: supportEmail));
+  if (context.mounted) _snack(context, tr('Aucune app e-mail trouvée : adresse copiée ($supportEmail)', 'لا يوجد تطبيق بريد: تم نسخ العنوان ($supportEmail)'));
+}
+
+void _export(BuildContext context) {
+  final data = {
+    'compte': {'nom': store.name, 'email': store.email, 'code_client': store.code},
+    'points_par_commerce': [for (final r in store.wallet) {'commerce': (r['shops'] as Map?)?['name'], 'points': r['points']}],
+    'transactions': store.txs,
+  };
+  Clipboard.setData(ClipboardData(text: const JsonEncoder.withIndent('  ').convert(data)));
+  _snack(context, tr('Vos données ont été copiées : collez-les où vous voulez', 'تم نسخ بياناتك: الصقها حيث تريد'));
+}
+
+// =====================================================================
+//  ÉCRAN PROFIL (onglet)
+//  En-tête sombre (avatar, nom, niveau, ⚙️) + carte de progression jaune,
+//  puis une feuille claire aux coins arrondis : tuiles de raccourcis et liste.
+//  Les réglages sont dans SettingsPage, ouverte par le bouton ⚙️.
+// =====================================================================
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  Widget _header(BuildContext c, Map<String, dynamic> lv) {
+    final lvColor = lv['color'] as Color;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(c).padding.top + 14, 20, 22),
+      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brandDark, _hdrEnd])),
+      child: Column(children: [
+        Row(children: [
+          GestureDetector(
+            onTap: () => _editProfile(c),
+            child: Container(
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: lvColor, width: 2)),
+              child: CircleAvatar(
+                radius: 28,
+                backgroundColor: avatarColors[store.avatarColor % avatarColors.length],
+                child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(child: Text(store.name.isEmpty ? '…' : store.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700))),
+                const SizedBox(width: 10),
+                NIcon('trophy', size: 18, color: lvColor, accent: Colors.white),
+                const SizedBox(width: 4),
+                Text('${lv['name']}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+              ]),
+              const SizedBox(height: 2),
+              Text(store.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          _roundBtn(c, 'settings', tr('Paramètres', 'الإعدادات'), () => Navigator.push(c, smoothRoute(const SettingsPage())), onDark: true),
+        ]),
+        const SizedBox(height: 20),
+        _levelBanner(lv),
+      ]),
+    );
+  }
+
+  /// Carte jaune (comme la bannière promo de l'app d'inspiration) : niveau + progression + points.
+  Widget _levelBanner(Map<String, dynamic> lv) {
     final next = lv['next'] as int?, from = lv['from'] as int, visits = lv['visits'] as int;
     final progress = next == null ? 1.0 : ((visits - from) / (next - from)).clamp(0.0, 1.0).toDouble();
     return Container(
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 22),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandYellow, Color(0xFFFFC300)]),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-        image: const DecorationImage(image: AssetImage('robot.png'), alignment: Alignment(1.5, 1.4), scale: 1.6, opacity: 0.16),
-        boxShadow: [BoxShadow(color: brandYellow.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 10))],
-      ),
-      child: Column(children: [
-        Row(children: [
-          Text(tr('Profil', 'الملف'), style: const TextStyle(color: Colors.black87, fontSize: 20, fontWeight: FontWeight.bold)),
-          const Spacer(),
-          IconButton(icon: const NIcon('edit', color: Colors.black87), onPressed: () => _editProfile(context)),
-        ]),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.6, end: 1),
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.elasticOut,
-          builder: (_, v, child) => Transform.scale(scale: v, child: child),
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(colors: [Colors.white, lv['color'] as Color, Colors.white])),
-            child: CircleAvatar(
-              radius: 46,
-              backgroundColor: avatarColors[store.avatarColor % avatarColors.length],
-              child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold)),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(color: brandYellow, borderRadius: BorderRadius.circular(18)),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(color: Colors.black87, fontSize: 17, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(
+              next == null ? tr('Niveau maximum atteint', 'وصلت لأعلى مستوى') : '${next - visits} ${tr('visites avant le niveau', 'زيارات قبل المستوى')} ${lv['next_name']}',
+              style: const TextStyle(color: Colors.black87, fontSize: 13),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(store.name.isEmpty ? '…' : store.name, style: const TextStyle(color: Colors.black87, fontSize: 22, fontWeight: FontWeight.bold)),
-        Text(store.email, style: const TextStyle(color: Colors.black54)),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.55), borderRadius: BorderRadius.circular(16)),
-          child: Column(children: [
-            Row(children: [
-              NIcon('trophy', size: 24, color: lv['color'] as Color, accent: Colors.white),
-              const SizedBox(width: 8),
-              Text('${tr('Membre', 'عضو')} ${lv['name']}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text(next == null ? tr('Niveau maximum', 'أعلى مستوى') : '$visits / $next ${tr('visites', 'زيارات')}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
-            ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: progress),
               duration: const Duration(milliseconds: 900),
               curve: Curves.easeOutCubic,
-              builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: v, minHeight: 7, backgroundColor: Colors.black12, color: lv['color'] as Color)),
+              builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: v, minHeight: 6, color: Colors.black87, backgroundColor: Colors.black12)),
             ),
-            if (next != null) Padding(padding: const EdgeInsets.only(top: 6), child: Align(alignment: AlignmentDirectional.centerStart, child: Text('${next - visits} ${tr('visites avant le niveau', 'زيارات قبل المستوى')} ${lv['next_name']}', style: const TextStyle(color: Colors.black54, fontSize: 12)))),
           ]),
         ),
-        const SizedBox(height: 14),
-        Row(children: [
-          _stat(store.total, tr('Points', 'نقاط')),
-          const SizedBox(width: 10),
-          _stat(store.wallet.length, tr('Commerces', 'متاجر')),
-          const SizedBox(width: 10),
-          _stat(store.rewardsReady.length, tr('Récompenses', 'مكافآت')),
+        const SizedBox(width: 18),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          AnimatedCount(store.total, style: const TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
+          Text('${tr('points', 'نقطة')} · ${store.wallet.length} ${tr('commerce(s)', 'متجر')}', style: const TextStyle(color: Colors.black87, fontSize: 11.5)),
         ]),
       ]),
     );
   }
 
-  Widget _section(BuildContext context, int i, String title, List<Widget> tiles) => FadeSlideIn(
-        index: i,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsetsDirectional.only(start: 6, bottom: 8), child: Text(title.toUpperCase(), style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1))),
-            Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
+  /// Tuile de raccourci (icône + libellé), fond teinté sans contour.
+  Widget _tile(BuildContext c, String icon, String label, VoidCallback onTap) => Expanded(
+        child: Pressable(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 6),
+            decoration: BoxDecoration(color: _tint(c), borderRadius: BorderRadius.circular(18)),
+            child: SizedBox(
+              width: double.infinity,
               child: Column(children: [
-                for (var k = 0; k < tiles.length; k++) ...[if (k > 0) const Divider(height: 1, indent: 60), tiles[k]],
+                NIcon(icon, size: 28, color: _ink(c), accent: _gold(c)),
+                const SizedBox(height: 10),
+                Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               ]),
             ),
-          ]),
+          ),
         ),
       );
 
-  Widget _icon(String icon, Color color) => Container(width: 36, height: 36, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)), child: NIcon(icon, color: Colors.white, size: 20));
-
-  Widget _tile(String icon, Color color, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap}) => ListTile(
-        onTap: onTap,
-        leading: _icon(icon, color),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: subtitle == null ? null : Text(subtitle),
-        trailing: trailing ?? (onTap != null ? const NIcon('chevron') : null),
-      );
-
-  Widget _switch(String icon, Color color, String title, String subtitle, bool value, void Function(bool) onChanged, {bool enabled = true}) => _tile(
-        icon, enabled ? color : Colors.grey, title,
-        subtitle: subtitle,
-        trailing: Switch(value: value && enabled, onChanged: enabled ? (v) { HapticFeedback.selectionClick(); onChanged(v); } : null),
-        onTap: enabled ? () { HapticFeedback.selectionClick(); onChanged(!value); } : null,
-      );
-
-  Widget _choice(String icon, Color color, String title, Widget control) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [_icon(icon, color), const SizedBox(width: 12), Text(title, style: const TextStyle(fontWeight: FontWeight.w600))]),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, child: control),
-        ]),
+  Widget _pill(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: brandYellow, borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w700)),
       );
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (_, __) => ListView(padding: EdgeInsets.zero, children: [
-          _header(context),
-          _section(context, 0, tr('Compte', 'الحساب'), [
-            _tile('user', Colors.teal, tr('Modifier mon profil', 'تعديل ملفي'), subtitle: tr('Nom et couleur de l\'avatar', 'الاسم ولون الصورة'), onTap: () => _editProfile(context)),
-            _tile('at', Colors.blue, tr('E-mail', 'البريد'), subtitle: store.email),
-            _tile('hash', Colors.indigo, tr('Mon code client', 'رمز الزبون'), subtitle: store.code.isEmpty ? '—' : store.code, trailing: const NIcon('copy', size: 20), onTap: () {
-              if (store.code.isEmpty) return;
-              Clipboard.setData(ClipboardData(text: store.code));
-              _snack(context, tr('Code copié', 'تم نسخ الرمز'));
-            }),
-          ]),
-          _section(context, 1, tr('Sécurité', 'الأمان'), [
-            const PinSettingsTile(),
-            if (store.hasPin)
-              _switch('fingerprint', Colors.teal, tr('Déverrouiller avec l\'empreinte', 'الفتح بالبصمة'), tr('Au lieu de saisir le code PIN', 'بدل إدخال رمز PIN'), store.bioEnabled, (v) async {
-                try {
-                  await store.setBio(v);
-                } catch (e) {
-                  _snack(context, errText(e));
-                }
-              }),
-            _tile('password', Colors.orange, tr('Changer le mot de passe', 'تغيير كلمة السر'), onTap: () => _changePassword(context)),
-            _tile('devices', Colors.deepPurple, tr('Se déconnecter de tous les appareils', 'تسجيل الخروج من كل الأجهزة'), onTap: () async {
-              if (await _confirm(context, tr('Déconnexion partout', 'خروج من كل الأجهزة'), tr('Vous serez déconnecté de tous vos appareils, y compris celui-ci.', 'سيتم تسجيل خروجك من كل أجهزتك بما فيها هذا الجهاز.'), tr('Déconnecter', 'خروج'))) {
-                await store.signOutEverywhere();
-              }
-            }),
-          ]),
-          _section(context, 2, tr('Notifications', 'الإشعارات'), [
-            _switch('bell', brandLight, tr('Notifications activées', 'الإشعارات مفعّلة'), tr('Tout activer ou tout désactiver', 'تفعيل أو إيقاف الكل'), store.notifsOn, (v) => store.setNotifsOn(v)),
-            _switch('coin', Colors.green, tr('Points gagnés', 'النقاط المكتسبة'), tr('À chaque visite', 'عند كل زيارة'), store.nPoints, (v) => store.setNotifPref('points', v), enabled: store.notifsOn),
-            _switch('gift', Colors.amber.shade700, tr('Récompenses', 'المكافآت'), tr('Récompense débloquée ou utilisée', 'مكافأة مفتوحة أو مستخدمة'), store.nRewards, (v) => store.setNotifPref('rewards', v), enabled: store.notifsOn),
-            _switch('tag', Colors.pink, tr('Offres des commerces', 'عروض المتاجر'), tr('Vos commerces et favoris', 'متاجرك ومفضلتك'), store.nOffers, (v) => store.setNotifPref('offers', v), enabled: store.notifsOn),
-            _tile('bell', Colors.grey, tr('Notifications quand l\'app est fermée', 'إشعارات عند إغلاق التطبيق'), subtitle: tr('Bientôt disponible', 'قريبًا')),
-          ]),
-          _section(context, 3, tr('Apparence et langue', 'المظهر واللغة'), [
-            _choice(
-              'contrast',
-              Colors.blueGrey,
-              tr('Thème', 'السمة'),
-              SegmentedButton<ThemeMode>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: ThemeMode.system, label: Text(tr('Auto', 'تلقائي'))),
-                  ButtonSegment(value: ThemeMode.light, label: Text(tr('Clair', 'فاتح'))),
-                  ButtonSegment(value: ThemeMode.dark, label: Text(tr('Sombre', 'داكن'))),
-                ],
-                selected: {store.themeMode},
-                onSelectionChanged: (s) => store.setThemeMode(s.first),
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light, // icônes de la barre d'état claires sur l'en-tête sombre
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (_, __) {
+            final lv = levelInfo();
+            return ListView(padding: EdgeInsets.zero, children: [
+              FadeSlideIn(child: _header(context, lv)),
+              // le fond sombre n'apparaît que derrière les coins arrondis de la feuille
+              Container(
+                color: _hdrEnd,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
+                  decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
+                  child: Column(children: [
+                    FadeSlideIn(
+                      index: 1,
+                      child: Row(children: [
+                        _tile(context, 'history', tr('Historique', 'السجل'), () => Navigator.push(context, smoothRoute(const HistoryPage()))),
+                        const SizedBox(width: 10),
+                        _tile(context, 'bell', tr('Notifications', 'الإشعارات'), () => Navigator.push(context, smoothRoute(const NotificationsPage()))),
+                        const SizedBox(width: 10),
+                        _tile(context, 'help', tr('Aide', 'المساعدة'), () => Navigator.push(context, smoothRoute(const HelpPage()))),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      index: 2,
+                      child: _group(context, [
+                        _row(context, 'user', tr('Informations personnelles', 'المعلومات الشخصية'), onTap: () => _editProfile(context)),
+                        _row(context, 'hash', tr('Mon code client', 'رمز الزبون'), subtitle: store.code.isEmpty ? '—' : store.code, trailing: NIcon('copy', size: 20, color: _ink(context), accent: _gold(context)), onTap: () {
+                          if (store.code.isEmpty) return;
+                          Clipboard.setData(ClipboardData(text: store.code));
+                          _snack(context, tr('Code copié', 'تم نسخ الرمز'));
+                        }),
+                        _row(context, 'gift', tr('Parrainage', 'الترشيح'), trailing: _pill(tr('Inviter un ami', 'ادعُ صديقًا')), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
+                        // Support : désactivé pour l'instant. Pour le réactiver, remplacer par : onTap: () => _contactSupport(context)
+                        _row(context, 'support', tr('Contacter le support', 'اتصل بالدعم'), subtitle: tr('Bientôt disponible', 'قريبًا')),
+                      ]),
+                    ),
+                  ]),
+                ),
               ),
-            ),
-            _choice(
-              'globe',
-              Colors.cyan.shade700,
-              tr('Langue', 'اللغة'),
-              SegmentedButton<String>(
-                showSelectedIcon: false,
-                segments: const [ButtonSegment(value: 'fr', label: Text('Français')), ButtonSegment(value: 'ar', label: Text('العربية'))],
-                selected: {lang},
-                onSelectionChanged: (s) => store.setLang(s.first),
+            ]);
+          },
+        ),
+      );
+}
+
+// =====================================================================
+//  PAGE PARAMÈTRES (ouverte depuis le bouton ⚙️ du profil)
+// =====================================================================
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: ListenableBuilder(
+            listenable: store,
+            builder: (_, __) => ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+              FadeSlideIn(
+                child: Row(children: [
+                  _roundBtn(context, 'back', tr('Retour', 'رجوع'), () => Navigator.pop(context)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Text(tr('Paramètres', 'الإعدادات'), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: lang == 'ar' ? 0 : -0.4))),
+                ]),
               ),
-            ),
-            _choice(
-              'text',
-              Colors.brown,
-              tr('Taille du texte', 'حجم النص'),
-              SegmentedButton<double>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 1.0, label: Text('Aa', style: TextStyle(fontSize: 13))),
-                  ButtonSegment(value: 1.15, label: Text('Aa', style: TextStyle(fontSize: 16))),
-                  ButtonSegment(value: 1.3, label: Text('Aa', style: TextStyle(fontSize: 19))),
-                ],
-                selected: {store.textScale},
-                onSelectionChanged: (s) => store.setTextScale(s.first),
+              _title(context, tr('Sécurité', 'الأمان')),
+              FadeSlideIn(
+                index: 1,
+                child: _group(context, [
+                  const PinSettingsTile(),
+                  if (store.hasPin)
+                    _switchRow(context, 'fingerprint', tr('Déverrouiller avec l\'empreinte', 'الفتح بالبصمة'), tr('Au lieu de saisir le code PIN', 'بدل إدخال رمز PIN'), store.bioEnabled, (v) async {
+                      try {
+                        await store.setBio(v);
+                      } catch (e) {
+                        _snack(context, errText(e));
+                      }
+                    }),
+                  _row(context, 'password', tr('Changer le mot de passe', 'تغيير كلمة السر'), onTap: () => _changePassword(context)),
+                  _row(context, 'devices', tr('Se déconnecter de tous les appareils', 'تسجيل الخروج من كل الأجهزة'), onTap: () async {
+                    if (await _confirm(context, tr('Déconnexion partout', 'خروج من كل الأجهزة'), tr('Vous serez déconnecté de tous vos appareils, y compris celui-ci.', 'سيتم تسجيل خروجك من كل أجهزتك بما فيها هذا الجهاز.'), tr('Déconnecter', 'خروج'))) {
+                      await store.signOutEverywhere();
+                    }
+                  }),
+                ]),
               ),
-            ),
-          ]),
-          _section(context, 4, tr('Confidentialité et données', 'الخصوصية والبيانات'), [
-            _tile('pin', Colors.red, tr('Autorisation de localisation', 'إذن الموقع'), subtitle: tr('Gérer dans les réglages du téléphone', 'إدارة من إعدادات الهاتف'), onTap: () => Geolocator.openAppSettings()),
-            _tile('download', Colors.teal, tr('Exporter mes données', 'تصدير بياناتي'), subtitle: tr('Copie votre compte, vos points et vos transactions', 'ينسخ حسابك ونقاطك ومعاملاتك'), onTap: () => _export(context)),
-            _tile('shield', Colors.blue, tr('Politique de confidentialité', 'سياسة الخصوصية'), onTap: () => Navigator.push(context, smoothRoute(const PolicyPage()))),
-            _tile('doc', Colors.grey.shade700, tr('Conditions d\'utilisation', 'شروط الاستخدام'), onTap: () => _info(context, tr('Conditions d\'utilisation', 'شروط الاستخدام'), tr(
-              'Nqata est un service de cartes de fidélité entre des clients et des commerces partenaires. Les points appartiennent au programme de chaque commerce, qui peut en fixer les règles (points par visite, seuil de récompense). Vous êtes responsable de la confidentialité de vos identifiants et de votre code PIN. Ces conditions sont provisoires et seront complétées avant la publication.',
-              'نقطة خدمة بطاقات ولاء بين الزبائن والمتاجر الشريكة. النقاط تابعة لبرنامج كل متجر الذي يحدد قواعده (نقاط الزيارة، حد المكافأة). أنت مسؤول عن سرية بيانات دخولك ورمز PIN. هذه الشروط مؤقتة وسيتم استكمالها قبل النشر.'))),
-          ]),
-          _section(context, 5, tr('Aide', 'المساعدة'), [
-            _tile('history', Colors.purple, tr('Historique complet', 'السجل الكامل'), onTap: () => Navigator.push(context, smoothRoute(const HistoryPage()))),
-            _tile('gift', Colors.pink, tr('Parrainage', 'الترشيح'), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
-            _tile('help', Colors.green, tr('Aide et questions fréquentes', 'المساعدة والأسئلة الشائعة'), onTap: () => Navigator.push(context, smoothRoute(const HelpPage()))),
-            _tile('support', Colors.blue, tr('Contacter le support', 'اتصل بالدعم'), subtitle: supportEmail, onTap: () => _contactSupport(context)),
-          ]),
-          _section(context, 6, tr('À propos', 'حول'), [
-            _tile('info', Colors.grey, 'Nqata', subtitle: '${tr('Version', 'الإصدار')} 0.1.0'),
-            _tile('doc', Colors.grey.shade600, tr('Licences', 'التراخيص'), onTap: () => showLicensePage(context: context, applicationName: 'Nqata', applicationVersion: '0.1.0')),
-          ]),
-          _section(context, 7, tr('Compte', 'الحساب'), [
-            _tile('logout', Colors.blueGrey, tr('Se déconnecter', 'تسجيل الخروج'), onTap: () async {
-              if (await _confirm(context, tr('Se déconnecter ?', 'تسجيل الخروج؟'), tr('Vous pourrez vous reconnecter à tout moment.', 'يمكنك الدخول مجددًا في أي وقت.'), tr('Déconnexion', 'خروج'))) await store.signOut();
-            }),
-            ListTile(
-              onTap: () async {
-                if (await _confirm(context, tr('Supprimer mon compte ?', 'حذف حسابي؟'), tr('Votre compte, vos points et votre historique seront supprimés définitivement.', 'سيتم حذف حسابك ونقاطك وسجلك نهائيًا.'), tr('Supprimer', 'حذف'), danger: true)) {
-                  try {
-                    await store.deleteAccount();
-                  } catch (e) {
-                    _snack(context, errText(e));
-                  }
-                }
-              },
-              leading: _icon('trash', Colors.red),
-              title: Text(tr('Supprimer mon compte', 'حذف حسابي'), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-            ),
-          ]),
-          const SizedBox(height: 24),
-          const Center(child: Text('Nqata 0.1.0', style: TextStyle(color: Colors.grey, fontSize: 12))),
-          const SizedBox(height: 24),
-        ]),
+              _title(context, tr('Notifications', 'الإشعارات')),
+              FadeSlideIn(
+                index: 2,
+                child: _group(context, [
+                  _switchRow(context, 'bell', tr('Notifications activées', 'الإشعارات مفعّلة'), tr('Tout activer ou tout désactiver', 'تفعيل أو إيقاف الكل'), store.notifsOn, (v) => store.setNotifsOn(v)),
+                  _switchRow(context, 'coin', tr('Points gagnés', 'النقاط المكتسبة'), tr('À chaque visite', 'عند كل زيارة'), store.nPoints, (v) => store.setNotifPref('points', v), enabled: store.notifsOn),
+                  _switchRow(context, 'gift', tr('Récompenses', 'المكافآت'), tr('Récompense débloquée ou utilisée', 'مكافأة مفتوحة أو مستخدمة'), store.nRewards, (v) => store.setNotifPref('rewards', v), enabled: store.notifsOn),
+                  _switchRow(context, 'tag', tr('Offres des commerces', 'عروض المتاجر'), tr('Vos commerces et favoris', 'متاجرك ومفضلتك'), store.nOffers, (v) => store.setNotifPref('offers', v), enabled: store.notifsOn),
+                ]),
+              ),
+              _title(context, tr('Apparence et langue', 'المظهر واللغة')),
+              FadeSlideIn(
+                index: 3,
+                child: _group(context, [
+                  _choice(
+                    context,
+                    'contrast',
+                    tr('Thème', 'السمة'),
+                    SegmentedButton<ThemeMode>(
+                      showSelectedIcon: false,
+                      segments: [
+                        ButtonSegment(value: ThemeMode.system, label: Text(tr('Auto', 'تلقائي'))),
+                        ButtonSegment(value: ThemeMode.light, label: Text(tr('Clair', 'فاتح'))),
+                        ButtonSegment(value: ThemeMode.dark, label: Text(tr('Sombre', 'داكن'))),
+                      ],
+                      selected: {store.themeMode},
+                      onSelectionChanged: (s) => store.setThemeMode(s.first),
+                    ),
+                  ),
+                  _choice(
+                    context,
+                    'globe',
+                    tr('Langue', 'اللغة'),
+                    SegmentedButton<String>(
+                      showSelectedIcon: false,
+                      segments: const [ButtonSegment(value: 'fr', label: Text('Français')), ButtonSegment(value: 'ar', label: Text('العربية'))],
+                      selected: {lang},
+                      onSelectionChanged: (s) => store.setLang(s.first),
+                    ),
+                  ),
+                  _choice(
+                    context,
+                    'text',
+                    tr('Taille du texte', 'حجم النص'),
+                    SegmentedButton<double>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: 1.0, label: Text('Aa', style: TextStyle(fontSize: 13))),
+                        ButtonSegment(value: 1.15, label: Text('Aa', style: TextStyle(fontSize: 16))),
+                        ButtonSegment(value: 1.3, label: Text('Aa', style: TextStyle(fontSize: 19))),
+                      ],
+                      selected: {store.textScale},
+                      onSelectionChanged: (s) => store.setTextScale(s.first),
+                    ),
+                  ),
+                ]),
+              ),
+              _title(context, tr('Confidentialité et données', 'الخصوصية والبيانات')),
+              FadeSlideIn(
+                index: 4,
+                child: _group(context, [
+                  _row(context, 'pin', tr('Autorisation de localisation', 'إذن الموقع'), subtitle: tr('Gérer dans les réglages du téléphone', 'إدارة من إعدادات الهاتف'), onTap: () => Geolocator.openAppSettings()),
+                  _row(context, 'download', tr('Exporter mes données', 'تصدير بياناتي'), subtitle: tr('Copie votre compte, vos points et vos transactions', 'ينسخ حسابك ونقاطك ومعاملاتك'), onTap: () => _export(context)),
+                  _row(context, 'shield', tr('Politique de confidentialité', 'سياسة الخصوصية'), onTap: () => Navigator.push(context, smoothRoute(const PolicyPage()))),
+                  _row(context, 'doc', tr('Conditions d\'utilisation', 'شروط الاستخدام'), onTap: () => _info(context, tr('Conditions d\'utilisation', 'شروط الاستخدام'), tr(
+                    'Nqata est un service de cartes de fidélité entre des clients et des commerces partenaires. Les points appartiennent au programme de chaque commerce, qui peut en fixer les règles (points par visite, seuil de récompense). Vous êtes responsable de la confidentialité de vos identifiants et de votre code PIN. Ces conditions sont provisoires et seront complétées avant la publication.',
+                    'نقطة خدمة بطاقات ولاء بين الزبائن والمتاجر الشريكة. النقاط تابعة لبرنامج كل متجر الذي يحدد قواعده (نقاط الزيارة، حد المكافأة). أنت مسؤول عن سرية بيانات دخولك ورمز PIN. هذه الشروط مؤقتة وسيتم استكمالها قبل النشر.'))),
+                ]),
+              ),
+              _title(context, tr('À propos', 'حول')),
+              FadeSlideIn(
+                index: 5,
+                child: _group(context, [
+                  _row(context, 'info', 'Nqata', subtitle: '${tr('Version', 'الإصدار')} $appVersion'),
+                  _row(context, 'doc', tr('Licences', 'التراخيص'), onTap: () => showLicensePage(context: context, applicationName: 'Nqata', applicationVersion: appVersion)),
+                ]),
+              ),
+              _title(context, tr('Compte', 'الحساب')),
+              FadeSlideIn(
+                index: 6,
+                child: _group(context, [
+                  _row(context, 'logout', tr('Se déconnecter', 'تسجيل الخروج'), onTap: () async {
+                    if (await _confirm(context, tr('Se déconnecter ?', 'تسجيل الخروج؟'), tr('Vous pourrez vous reconnecter à tout moment.', 'يمكنك الدخول مجددًا في أي وقت.'), tr('Déconnexion', 'خروج'))) {
+                      await store.signOut();
+                      if (context.mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+                    }
+                  }),
+                  _row(context, 'trash', tr('Supprimer mon compte', 'حذف حسابي'), danger: true, onTap: () async {
+                    if (await _confirm(context, tr('Supprimer mon compte ?', 'حذف حسابي؟'), tr('Votre compte, vos points et votre historique seront supprimés définitivement.', 'سيتم حذف حسابك ونقاطك وسجلك نهائيًا.'), tr('Supprimer', 'حذف'), danger: true)) {
+                      try {
+                        await store.deleteAccount();
+                        if (context.mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+                      } catch (e) {
+                        _snack(context, errText(e));
+                      }
+                    }
+                  }),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              Center(child: Text('Nqata $appVersion', style: TextStyle(color: _muted(context), fontSize: 12))),
+            ]),
+          ),
+        ),
       );
 }
