@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: lv['color'] as Color, width: 2)),
-            child: CircleAvatar(radius: 22, backgroundColor: avatarColors[store.avatarColor % avatarColors.length], child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600))),
+            child: NAvatar(id: store.avatarId, size: 44, color: avatarColors[store.avatarColor % avatarColors.length], initial: store.name.isEmpty ? '?' : store.name[0].toUpperCase()),
           ),
         ),
         const SizedBox(width: 12),
