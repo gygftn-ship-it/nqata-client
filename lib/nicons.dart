@@ -67,7 +67,7 @@ const _icons = <String, String>{
   'back': r'<path d="M19 12H5M11 6l-6 6 6 6"/>',
   'add': r'<path d="M12 5v14M5 12h14"/>',
   'block': r'<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
-  'settings': r'<circle cx="12" cy="12" r="6.3"/><circle cx="12" cy="12" r="2.2" fill="{A}" stroke="none"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6"/>',
+  'settings': r'<circle cx="12" cy="12" r="3.2" fill="{A}"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   'near': r'<path d="M20 4 4.5 10.5l6 2.5 2.5 6z"/><circle cx="10.2" cy="12.8" r="1.2" fill="{A}" stroke="none"/>',
 };
 
@@ -109,4 +109,96 @@ class RobotBadge extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: _yellow, width: 4), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, 6))]),
         child: ClipOval(child: Image.asset('robot.png', fit: BoxFit.contain)),
       );
+}
+
+// ---------------------------------------------------------------------
+//  Avatars illustrés (dessinés en SVG, aucune image à ajouter au projet)
+// ---------------------------------------------------------------------
+class _Av {
+  final String style; // short, long, bun, curly, cap, hijab
+  final Color bg, skin, hair, shirt, accent; // accent : couleur du foulard (hijab) ou de la casquette (cap)
+  final bool glasses, beard;
+  const _Av(this.style, {required this.bg, required this.skin, required this.hair, required this.shirt, this.accent = const Color(0xFF15120B), this.glasses = false, this.beard = false});
+}
+
+const _avatars = [
+  _Av('short', bg: Color(0xFFFDE68A), skin: Color(0xFFE0AC82), hair: Color(0xFF2B2118), shirt: Color(0xFF3B82F6)),
+  _Av('short', bg: Color(0xFFBFDBFE), skin: Color(0xFFC68B5E), hair: Color(0xFF1F1A14), shirt: Color(0xFF15120B), beard: true),
+  _Av('cap', bg: Color(0xFFBBF7D0), skin: Color(0xFFF5D0B0), hair: Color(0xFF5A3A1E), shirt: Color(0xFFEF4444), accent: Color(0xFF15120B)),
+  _Av('short', bg: Color(0xFFFBCFE8), skin: Color(0xFF8D5A3B), hair: Color(0xFF15120B), shirt: Color(0xFF14B8A6), glasses: true),
+  _Av('long', bg: Color(0xFFDDD6FE), skin: Color(0xFFE0AC82), hair: Color(0xFF2B1A12), shirt: Color(0xFFEC4899)),
+  _Av('hijab', bg: Color(0xFFFDE68A), skin: Color(0xFFF5D0B0), hair: Color(0xFF2B2118), shirt: Color(0xFF15120B), accent: Color(0xFF7C3AED)),
+  _Av('hijab', bg: Color(0xFFFED7AA), skin: Color(0xFFC68B5E), hair: Color(0xFF2B2118), shirt: Color(0xFFF59E0B), accent: Color(0xFF14B8A6)),
+  _Av('bun', bg: Color(0xFFA5F3FC), skin: Color(0xFF8D5A3B), hair: Color(0xFF15120B), shirt: Color(0xFFF59E0B)),
+  _Av('curly', bg: Color(0xFFFDE68A), skin: Color(0xFF5C3A24), hair: Color(0xFF15120B), shirt: Color(0xFF7C3AED)),
+  _Av('long', bg: Color(0xFFBBF7D0), skin: Color(0xFFF5D0B0), hair: Color(0xFFB45309), shirt: Color(0xFF3B82F6), glasses: true),
+  _Av('hijab', bg: Color(0xFFBFDBFE), skin: Color(0xFFE0AC82), hair: Color(0xFF2B2118), shirt: Color(0xFF475569), accent: Color(0xFFEC4899)),
+  _Av('short', bg: Color(0xFFE5E7EB), skin: Color(0xFFE0AC82), hair: Color(0xFF5A3A1E), shirt: Color(0xFF15120B), beard: true, glasses: true),
+];
+
+/// Identifiants proposés dans le sélecteur : 'a0'…'a11' + la mascotte Nqata. ('' = simple initiale)
+const avatarIds = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'a11', 'robot'];
+
+String _avatarSvg(_Av a) {
+  const ink = '#2B2118';
+  final skin = _hex(a.skin), hair = _hex(a.hair), shirt = _hex(a.shirt), acc = _hex(a.accent);
+  final b = StringBuffer('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">')
+    ..write('<rect width="100" height="100" fill="${_hex(a.bg)}"/>');
+  if (a.style == 'long') b.write('<path d="M27 50C23 22 77 22 73 50L76 80H24Z" fill="$hair"/>');
+  b.write('<path d="M14 100C14 80 31 72 50 72S86 80 86 100Z" fill="$shirt"/>');
+  if (a.style == 'hijab') {
+    b.write('<path d="M24 54C20 18 80 18 76 54C78 72 72 84 62 90H38C28 84 22 72 24 54Z" fill="$acc"/>');
+    b.write('<ellipse cx="50" cy="52" rx="15.5" ry="17.5" fill="$skin"/>');
+    b.write('<circle cx="44.5" cy="52" r="1.9" fill="$ink"/><circle cx="55.5" cy="52" r="1.9" fill="$ink"/>');
+    b.write('<path d="M44.5 60Q50 64.5 55.5 60" fill="none" stroke="$ink" stroke-width="2" stroke-linecap="round"/>');
+  } else {
+    b.write('<rect x="44" y="60" width="12" height="16" rx="5" fill="$skin"/>');
+    b.write('<circle cx="50" cy="46" r="20" fill="$skin"/>');
+    if (a.beard) b.write('<path d="M30 50C30 76 70 76 70 50C66 62 34 62 30 50Z" fill="$hair"/>');
+    b.write('<circle cx="43" cy="47" r="1.9" fill="$ink"/><circle cx="57" cy="47" r="1.9" fill="$ink"/>');
+    b.write('<path d="M43.5 56Q50 62 56.5 56" fill="none" stroke="$ink" stroke-width="2" stroke-linecap="round"/>');
+    switch (a.style) {
+      case 'short':
+        b.write('<path d="M30 46C27 21 73 21 70 46C66 36 58 31 50 31S34 36 30 46Z" fill="$hair"/>');
+      case 'long':
+        b.write('<path d="M30 45C33 28 67 28 70 45C62 37 38 37 30 45Z" fill="$hair"/>');
+      case 'bun':
+        b.write('<circle cx="50" cy="21" r="8" fill="$hair"/>');
+        b.write('<path d="M30 46C27 21 73 21 70 46C66 36 58 31 50 31S34 36 30 46Z" fill="$hair"/>');
+      case 'curly':
+        for (final p in const [[34, 36], [42, 28], [50, 26], [58, 28], [66, 36]]) {
+          b.write('<circle cx="${p[0]}" cy="${p[1]}" r="8" fill="$hair"/>');
+        }
+      case 'cap':
+        b.write('<path d="M29 43C29 20 71 20 71 43Z" fill="$acc"/><rect x="27" y="40" width="46" height="5" rx="2.5" fill="$acc"/>');
+    }
+    if (a.glasses) {
+      b.write('<circle cx="43" cy="47" r="5.5" fill="none" stroke="$ink" stroke-width="1.8"/><circle cx="57" cy="47" r="5.5" fill="none" stroke="$ink" stroke-width="1.8"/><path d="M48.5 47h3" stroke="$ink" stroke-width="1.8"/>');
+    }
+  }
+  b.write('</svg>');
+  return b.toString();
+}
+
+/// Avatar rond : illustration choisie, mascotte, ou initiale du nom sur fond [color] si [id] est vide.
+class NAvatar extends StatelessWidget {
+  final String id;
+  final String initial;
+  final Color color;
+  final double size;
+  const NAvatar({super.key, this.id = '', required this.initial, required this.color, this.size = 56});
+
+  @override
+  Widget build(BuildContext context) {
+    final i = id.startsWith('a') ? int.tryParse(id.substring(1)) : null;
+    final Widget inner;
+    if (id == 'robot') {
+      inner = Container(color: _yellow, padding: EdgeInsets.all(size * 0.12), child: Image.asset('robot.png', fit: BoxFit.contain));
+    } else if (i != null && i >= 0 && i < _avatars.length) {
+      inner = SvgPicture.string(_avatarSvg(_avatars[i]), width: size, height: size);
+    } else {
+      inner = Container(color: color, alignment: Alignment.center, child: Text(initial, style: TextStyle(color: Colors.white, fontSize: size * 0.45, fontWeight: FontWeight.w600)));
+    }
+    return SizedBox(width: size, height: size, child: ClipOval(child: inner));
+  }
 }
