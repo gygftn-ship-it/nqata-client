@@ -1,7 +1,7 @@
 name: nqata_client
-description: Nqata - application client (carte de fidélité)
+description: Nqate - application client (carte de fidélité)
 publish_to: none
-version: 0.1.0+1
+version: 0.7.6+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
