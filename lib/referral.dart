@@ -80,7 +80,7 @@ class _ReferralPageState extends State<ReferralPage> {
           child: FutureBuilder<Map<String, dynamic>>(
             future: stats,
             builder: (_, snap) {
-              final friends = snap.data?['friends'] ?? 0, paid = snap.data?['paid'] ?? 0;
+              final friends = snap.data?['friends'] ?? 0, paid = snap.data?['paid'] ?? 0, pts = snap.data?['points'] ?? store.referralPoints;
               return Row(children: [
                 Expanded(
                   child: Container(
@@ -95,6 +95,14 @@ class _ReferralPageState extends State<ReferralPage> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
                     child: Column(children: [Text('$paid', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)), Text(tr('Bonus reçus', 'المكافآت المستلمة'), style: const TextStyle(fontSize: 12))]),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
+                    child: Column(children: [Text('$pts', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)), Text(tr('Points Nqata', 'نقاط نقطة'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))]),
                   ),
                 ),
               ]);
