@@ -6,6 +6,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'main.dart';
+import 'home.dart'; // Pressable
+import 'map.dart'; // nqataTiles, mapAttribution
 import 'tabs.dart';
 
 // ---------- Catégories ----------
@@ -107,6 +109,14 @@ class _ShopPageState extends State<ShopPage> {
   late Future<List<Map<String, dynamic>>> reviews = store.shopReviews('${widget.shop['id']}');
   final comment = TextEditingController();
 
+  // ---------- Style commun (mêmes valeurs que profile.dart) ----------
+  bool get _dark => Theme.of(context).brightness == Brightness.dark;
+  Color get _ink => Theme.of(context).colorScheme.onSurface;
+  Color get _muted => _ink.withOpacity(0.62);
+  Color get _gold => _dark ? brandYellow : brandLight;
+  Color get _link => _dark ? brandYellow : const Color(0xFF8A6500);
+  Color get _tint => _dark ? const Color(0xFF1B1912) : const Color(0xFFF6F3EA);
+
   void _share(BuildContext context, Map<String, dynamic> s) {
     final lat = (s['lat'] as num?)?.toDouble(), lng = (s['lng'] as num?)?.toDouble();
     final desc = '${s['description'] ?? ''}';
@@ -116,18 +126,46 @@ class _ShopPageState extends State<ShopPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Lien copié : collez-le dans WhatsApp ou un message', 'تم نسخ الرابط: الصقه في واتساب أو رسالة'))));
   }
 
-  Widget _circleBtn(String i, VoidCallback onTap, {Color color = Colors.white}) =>
-      Padding(padding: const EdgeInsets.only(left: 6), child: CircleAvatar(backgroundColor: Colors.black45, child: IconButton(icon: NIcon(i, color: color), onPressed: onTap)));
-
-  Widget _chip(String text, {Color? bg, Color fg = Colors.black87, String? icon}) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: bg ?? Colors.black12, borderRadius: BorderRadius.circular(20)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [if (icon != null) ...[NIcon(icon, size: 15, color: fg), const SizedBox(width: 5)], Text(text, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600))]),
+  /// Bouton rond sur l'image de couverture (fond sombre translucide : lisible sur toutes les couvertures).
+  Widget _glass(String icon, String label, VoidCallback onTap, {bool amber = false}) => Semantics(
+        button: true,
+        label: label,
+        child: Pressable(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withOpacity(0.35), border: Border.all(color: Colors.white30)),
+            child: NIcon(icon, size: 22, color: amber ? Colors.amber : Colors.white, accent: amber ? Colors.amber : brandYellow),
+          ),
+        ),
       );
 
-  Widget _row(String i, String t) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [NIcon(i, size: 20, color: brandLight), const SizedBox(width: 10), Expanded(child: Text(t))]),
+  Widget _chip(String text, {Color? bg, Color? fg, String? icon}) {
+    final c = fg ?? _ink;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(color: bg ?? _ink.withOpacity(_dark ? 0.12 : 0.07), borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) ...[NIcon(icon, size: 15, color: c, accent: c), const SizedBox(width: 5)],
+        Text(text, style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
+
+  Widget _infoRow(String icon, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          NIcon(icon, size: 22, color: _ink, accent: _gold),
+          const SizedBox(width: 14),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, height: 1.3))),
+        ]),
+      );
+
+  Widget _title(String t) => Padding(
+        padding: const EdgeInsets.only(top: 26, bottom: 10, left: 4, right: 4),
+        child: Text(t, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: lang == 'ar' ? 0 : -0.2)),
       );
 
   @override
@@ -142,11 +180,9 @@ class _ShopPageState extends State<ShopPage> {
         builder: (_, __) {
           final s = store.shops.firstWhere((x) => x['id'] == widget.shop['id'], orElse: () => widget.shop);
           final id = '${s['id']}';
-          final theme = Theme.of(context);
           final fav = store.favs.contains(id);
           final open = openNow(s['hours'] as String?);
           final rating = store.ratings[id];
-          final my = store.myRatings[id] ?? 0;
           final rows = store.wallet.where((r) => (r['shops'] as Map?)?['id'] == s['id']).toList();
           final visited = rows.isNotEmpty;
           final pts = visited ? rows.first['points'] as int : 0;
@@ -154,178 +190,268 @@ class _ShopPageState extends State<ShopPage> {
           final offers = store.offers.where((o) => o['shop_id'] == s['id']).toList();
           final lat = (s['lat'] as num?)?.toDouble(), lng = (s['lng'] as num?)?.toDouble();
           final desc = '${s['description'] ?? ''}'.trim();
+          final km = widget.km ?? store.km(s);
           final top = MediaQuery.of(context).padding.top;
+          final bottom = MediaQuery.of(context).padding.bottom;
+          final coverH = 220.0 + top;
+          final okColor = _dark ? Colors.green.shade300 : Colors.green.shade800;
+          final noColor = _dark ? Colors.red.shade300 : Colors.red.shade800;
           return Scaffold(
-            body: ListView(padding: EdgeInsets.zero, children: [
-              Stack(clipBehavior: Clip.none, children: [
-                ShopCover(shop: s, height: 190 + top),
-                Positioned(top: top + 6, left: 8, child: _circleBtn('back', () => Navigator.pop(context))),
-                Positioned(
-                  top: top + 6,
-                  right: 8,
-                  child: Row(children: [
-                    _circleBtn(fav ? 'star_fill' : 'star', () => store.toggleFav(id), color: Colors.amber),
-                    _circleBtn('share', () => _share(context, s)),
-                  ]),
-                ),
-                PositionedDirectional(bottom: -42, start: 20, child: ShopLogo(shop: s, size: 88)),
-              ]),
-              const SizedBox(height: 52),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${s['name']}', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 8, runSpacing: 6, children: [
-                    _chip(rating == null ? tr('Nouveau', 'جديد') : '${(rating['avg_rating'] as num).toStringAsFixed(1)} (${rating['reviews_count']})', icon: 'star_fill', bg: Colors.amber.shade100),
-                    _chip(catLabel(s['category'] as String?), icon: catIcon(s['category'] as String?)),
-                    if (open != null) _chip(open ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), bg: open ? Colors.green.shade100 : Colors.red.shade100),
-                  ]),
-                  if (desc.isNotEmpty) ...[const SizedBox(height: 14), Text(desc, style: theme.textTheme.bodyLarge)],
-                  const SizedBox(height: 18),
-                  FadeSlideIn(
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
-                      child: Column(children: [
-                        _row('history', '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
-                        _row('pin', '${s['address'] ?? ''}'),
-                        if ((widget.km ?? store.km(s)) != null) _row('near', '${(widget.km ?? store.km(s))!.toStringAsFixed(1)} km'),
-                      ]),
-                    ),
+            body: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle.light, // icônes de la barre d'état claires sur la couverture
+              child: ListView(padding: EdgeInsets.zero, children: [
+                Stack(clipBehavior: Clip.none, children: [
+                  Positioned(top: 0, left: 0, right: 0, height: coverH, child: ShopCover(shop: s, height: coverH)),
+                  // voile sombre en haut : garde les boutons lisibles sur n'importe quelle image
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: top + 90,
+                    child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.45), Colors.transparent]))),
                   ),
-                  if (lat != null && lng != null) ...[
-                    const SizedBox(height: 14),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: SizedBox(
-                        height: 150,
-                        child: FlutterMap(
-                          options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: 15, interactionOptions: const InteractionOptions(flags: InteractiveFlag.none)),
-                          children: [
-                            TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'dz.nqata.client'),
-                            MarkerLayer(markers: [Marker(point: LatLng(lat, lng), width: 44, height: 44, child: const NIcon('pin', color: brandDark, size: 44))]),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      icon: const NIcon('directions'),
-                      label: Text(tr('Itinéraire', 'الاتجاهات')),
-                      onPressed: () => launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'), mode: LaunchMode.externalApplication),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  FadeSlideIn(
-                    index: 1,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: const LinearGradient(colors: [brandDark, brandLight])),
+                  // feuille aux coins arrondis, comme le Profil
+                  Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SizedBox(height: coverH - 28),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 54, 16, 0),
+                      decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(tr('Mes points ici', 'نقاطي هنا'), style: const TextStyle(color: Colors.white70)),
-                        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          AnimatedCount(pts, style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.bold)),
-                          Padding(padding: const EdgeInsets.only(bottom: 6, left: 6), child: Text('/ $thr', style: const TextStyle(color: Colors.white70))),
-                        ]),
-                        const SizedBox(height: 8),
-                        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (pts % thr) / thr, minHeight: 8, backgroundColor: Colors.white24, color: Colors.white)),
-                        const SizedBox(height: 6),
-                        Text(pts >= thr ? tr('Récompense disponible !', 'مكافأة متاحة!') : tr('Encore ${thr - pts % thr} points avant une récompense', 'بقي ${thr - pts % thr} نقطة للمكافأة'), style: const TextStyle(color: Colors.white)),
-                      ]),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Text(tr('Offres sur Nqata', 'العروض على نقطة'), style: theme.textTheme.titleMedium),
-                  if (offers.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(tr('Aucune offre pour le moment', 'لا توجد عروض حاليًا'))),
-                  for (var i = 0; i < offers.length; i++)
-                    FadeSlideIn(
-                      index: i,
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), gradient: LinearGradient(colors: cardGrads[(i + 1) % 4])),
-                        child: Row(children: [
-                          const NIcon('tag', color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text('${offers[i]['title']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        ]),
-                      ),
-                    ),
-                  const SizedBox(height: 22),
-                  Text(tr('Votre note', 'تقييمك'), style: theme.textTheme.titleMedium),
-                  Row(children: [
-                    for (var i = 1; i <= 5; i++)
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: visited ? () => setState(() => myStars = i) : null,
-                        icon: NIcon(i <= myStars ? 'star_fill' : 'star', color: Colors.amber, size: 36),
-                      ),
-                  ]),
-                  if (!visited) Text(tr('Visitez ce commerce pour pouvoir le noter.', 'زر هذا المتجر لتتمكن من تقييمه.'), style: const TextStyle(color: Colors.grey)),
-                  if (visited && myStars > 0) ...[
-                    const SizedBox(height: 8),
-                    TextField(controller: comment, maxLength: 500, maxLines: 3, decoration: InputDecoration(hintText: tr('Votre avis (optionnel)', 'رأيك (اختياري)'), border: const OutlineInputBorder())),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: FilledButton(
-                        onPressed: () async {
-                          try {
-                            await store.rate(id, myStars, comment: comment.text.trim().isEmpty ? null : comment.text.trim());
-                            if (mounted) setState(() => reviews = store.shopReviews(id));
-                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Merci pour votre avis !', 'شكرًا على رأيك!'))));
-                          } catch (e) {
-                            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
-                          }
-                        },
-                        child: Text(tr('Publier', 'نشر')),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  Text(tr('Avis des clients', 'آراء الزبائن'), style: theme.textTheme.titleMedium),
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: reviews,
-                    builder: (_, snap) {
-                      final list = snap.data ?? const [];
-                      if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: CircularProgressIndicator()));
-                      if (list.isEmpty) return Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(tr('Aucun avis pour le moment', 'لا توجد آراء حاليًا')));
-                      return Column(children: [
-                        for (final rv in list)
-                          Container(
-                            margin: const EdgeInsets.only(top: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Row(children: [
-                                Expanded(child: Text('${rv['display_name']}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                                for (var i = 1; i <= 5; i++) NIcon(i <= (rv['rating'] as int) ? 'star_fill' : 'star', size: 14, color: Colors.amber),
-                              ]),
-                              const SizedBox(height: 4),
-                              Text('${rv['comment']}'),
-                              if (rv['reply'] != null) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(10)),
-                                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text('${s['name']} : ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    Expanded(child: Text('${rv['reply']}', style: const TextStyle(fontSize: 12))),
-                                  ]),
-                                ),
-                              ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('${s['name']}', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: lang == 'ar' ? 0 : -0.4)),
+                            const SizedBox(height: 12),
+                            Wrap(spacing: 8, runSpacing: 8, children: [
+                              _chip(rating == null ? tr('Nouveau', 'جديد') : '${(rating['avg_rating'] as num).toStringAsFixed(1)} (${rating['reviews_count']})', icon: 'star_fill', bg: Colors.amber.withOpacity(_dark ? 0.2 : 0.22), fg: _dark ? Colors.amber.shade200 : const Color(0xFF7A5A00)),
+                              _chip(catLabel(s['category'] as String?), icon: catIcon(s['category'] as String?)),
+                              if (open != null) _chip(open ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), bg: (open ? Colors.green : Colors.red).withOpacity(_dark ? 0.2 : 0.14), fg: open ? okColor : noColor),
+                            ]),
+                            if (desc.isNotEmpty) ...[const SizedBox(height: 16), Text(desc, style: TextStyle(fontSize: 15.5, height: 1.45, color: _ink.withOpacity(0.85)))],
+                          ]),
+                        ),
+                        const SizedBox(height: 20),
+                        FadeSlideIn(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(22)),
+                            child: Column(children: [
+                              _infoRow('history', '${s['hours'] ?? tr('Horaires non renseignés', 'ساعات العمل غير محددة')}'),
+                              if ('${s['address'] ?? ''}'.isNotEmpty) _infoRow('pin', '${s['address']}'),
+                              if (km != null) _infoRow('near', '${km.toStringAsFixed(1)} km'),
                             ]),
                           ),
-                      ]);
-                    },
+                        ),
+                        if (lat != null && lng != null) ...[
+                          const SizedBox(height: 14),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: SizedBox(
+                              height: 170,
+                              child: FlutterMap(
+                                options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: 15, interactionOptions: const InteractionOptions(flags: InteractiveFlag.none)),
+                                children: [
+                                  nqataTiles(context),
+                                  MarkerLayer(markers: [
+                                    Marker(
+                                      point: LatLng(lat, lng),
+                                      width: 52,
+                                      height: 52,
+                                      child: Center(
+                                        child: Container(
+                                          width: 42,
+                                          height: 42,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(shape: BoxShape.circle, color: brandYellow, border: Border.all(color: brandDark, width: 2.5), boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3))]),
+                                          child: NIcon(catIcon(s['category'] as String?), size: 21, color: brandDark, accent: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ]),
+                                  mapAttribution,
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              icon: const NIcon('directions', color: Colors.black87, accent: Colors.black87),
+                              label: Text(tr('Itinéraire', 'الاتجاهات')),
+                              onPressed: () => launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'), mode: LaunchMode.externalApplication),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        // carte jaune (même gabarit que la bannière de niveau du Profil)
+                        FadeSlideIn(
+                          index: 1,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                            decoration: BoxDecoration(color: brandYellow, borderRadius: BorderRadius.circular(18)),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(children: [
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(tr('Mes points ici', 'نقاطي هنا'), style: const TextStyle(color: Colors.black87, fontSize: 17, fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 4),
+                                    Text(pts >= thr ? tr('Récompense disponible !', 'مكافأة متاحة!') : tr('Encore ${thr - pts % thr} points avant une récompense', 'بقي ${thr - pts % thr} نقطة للمكافأة'), style: const TextStyle(color: Colors.black87, fontSize: 13)),
+                                  ]),
+                                ),
+                                const SizedBox(width: 18),
+                                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                  AnimatedCount(pts, style: const TextStyle(color: Colors.black87, fontSize: 28, fontWeight: FontWeight.w800, height: 1.1)),
+                                  Text('/ $thr ${tr('points', 'نقطة')}', style: const TextStyle(color: Colors.black87, fontSize: 11.5)),
+                                ]),
+                              ]),
+                              const SizedBox(height: 10),
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: (pts % thr) / thr),
+                                duration: const Duration(milliseconds: 900),
+                                curve: Curves.easeOutCubic,
+                                builder: (_, v, __) => ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: v, minHeight: 6, color: Colors.black87, backgroundColor: Colors.black12)),
+                              ),
+                            ]),
+                          ),
+                        ),
+                        _title(tr('Offres sur Nqata', 'العروض على نقطة')),
+                        if (offers.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(18)),
+                            child: Text(tr('Aucune offre pour le moment', 'لا توجد عروض حاليًا'), style: TextStyle(color: _muted)),
+                          ),
+                        for (var i = 0; i < offers.length; i++)
+                          FadeSlideIn(
+                            index: i,
+                            child: Container(
+                              margin: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: cardGrads[(i + 1) % 4])),
+                              child: Row(children: [
+                                const NIcon('tag', size: 26, color: Colors.white, accent: brandYellow),
+                                const SizedBox(width: 14),
+                                Expanded(child: Text('${offers[i]['title']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
+                              ]),
+                            ),
+                          ),
+                        _title(tr('Votre note', 'تقييمك')),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                          decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(22)),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              for (var i = 1; i <= 5; i++)
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: visited ? () { HapticFeedback.selectionClick(); setState(() => myStars = i); } : null,
+                                  icon: NIcon(i <= myStars ? 'star_fill' : 'star', color: visited ? Colors.amber : _ink.withOpacity(0.3), accent: Colors.amber, size: 36),
+                                ),
+                            ]),
+                            if (!visited) Center(child: Text(tr('Visitez ce commerce pour pouvoir le noter.', 'زر هذا المتجر لتتمكن من تقييمه.'), textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 13.5))),
+                            if (visited && myStars > 0) ...[
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: comment,
+                                maxLength: 500,
+                                maxLines: 3,
+                                decoration: InputDecoration(
+                                  hintText: tr('Votre avis (optionnel)', 'رأيك (اختياري)'),
+                                  filled: true,
+                                  fillColor: Theme.of(context).scaffoldBackgroundColor,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _gold, width: 1.5)),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: FilledButton(
+                                  onPressed: () async {
+                                    try {
+                                      await store.rate(id, myStars, comment: comment.text.trim().isEmpty ? null : comment.text.trim());
+                                      if (mounted) setState(() => reviews = store.shopReviews(id));
+                                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Merci pour votre avis !', 'شكرًا على رأيك!'))));
+                                    } catch (e) {
+                                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errText(e))));
+                                    }
+                                  },
+                                  child: Text(tr('Publier', 'نشر')),
+                                ),
+                              ),
+                            ],
+                          ]),
+                        ),
+                        _title(tr('Avis des clients', 'آراء الزبائن')),
+                        FutureBuilder<List<Map<String, dynamic>>>(
+                          future: reviews,
+                          builder: (_, snap) {
+                            final list = snap.data ?? const [];
+                            if (snap.connectionState != ConnectionState.done) return const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Center(child: CircularProgressIndicator()));
+                            if (list.isEmpty) {
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(18)),
+                                child: Text(tr('Aucun avis pour le moment', 'لا توجد آراء حاليًا'), style: TextStyle(color: _muted)),
+                              );
+                            }
+                            return Column(children: [
+                              for (final rv in list)
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(color: _tint, borderRadius: BorderRadius.circular(18)),
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Row(children: [
+                                      Expanded(child: Text('${rv['display_name']}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+                                      for (var i = 1; i <= 5; i++) NIcon(i <= (rv['rating'] as int) ? 'star_fill' : 'star', size: 14, color: Colors.amber, accent: Colors.amber),
+                                    ]),
+                                    if ('${rv['comment'] ?? ''}'.isNotEmpty) ...[const SizedBox(height: 6), Text('${rv['comment']}', style: const TextStyle(fontSize: 14.5, height: 1.4))],
+                                    if (rv['reply'] != null) ...[
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: BorderRadius.circular(12)),
+                                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('${s['name']} : ', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                                          Expanded(child: Text('${rv['reply']}', style: const TextStyle(fontSize: 12.5, height: 1.35))),
+                                        ]),
+                                      ),
+                                    ],
+                                  ]),
+                                ),
+                            ]);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(icon: NIcon('share', color: _link, accent: _link), label: Text(tr('Copier le lien de partage', 'نسخ رابط المشاركة')), onPressed: () => _share(context, s)),
+                        ),
+                        SizedBox(height: 32 + bottom),
+                      ]),
+                    ),
+                  ]),
+                  // logo à cheval sur la couverture et la feuille
+                  PositionedDirectional(top: coverH - 28 - 44, start: 24, child: ShopLogo(shop: s, size: 88)),
+                  PositionedDirectional(top: top + 8, start: 16, child: _glass('back', tr('Retour', 'رجوع'), () => Navigator.pop(context))),
+                  PositionedDirectional(
+                    top: top + 8,
+                    end: 16,
+                    child: Row(children: [
+                      _glass(fav ? 'star_fill' : 'star', tr('Favori', 'مفضل'), () { HapticFeedback.selectionClick(); store.toggleFav(id); }, amber: true),
+                      const SizedBox(width: 10),
+                      _glass('share', tr('Partager', 'مشاركة'), () => _share(context, s)),
+                    ]),
                   ),
-                  const SizedBox(height: 18),
-                  FilledButton.icon(icon: const NIcon('share'), label: Text(tr('Copier le lien de partage', 'نسخ رابط المشاركة')), onPressed: () => _share(context, s)),
-                  const SizedBox(height: 32),
                 ]),
-              ),
-            ]),
+              ]),
+            ),
           );
         },
       );
