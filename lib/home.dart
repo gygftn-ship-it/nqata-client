@@ -87,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // Bannières : toutes les images du dossier (bucket) Supabase Storage « banners », triées par nom
   List<String> banners = [];
+  List<String> bannerNames = []; // noms de fichiers (même ordre) : peuvent contenir le titre et le sous-titre
   final bannerPc = PageController(viewportFraction: 0.92);
   int bannerIdx = 0;
   Timer? bannerTimer;
@@ -97,16 +98,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     try {
       final bucket = store.sb.storage.from('banners');
       final files = await bucket.list();
-      final urls = [
+      final names = [
         for (final f in files)
-          if (_imgExt.any((e) => f.name.toLowerCase().endsWith(e))) bucket.getPublicUrl(f.name),
+          if (_imgExt.any((e) => f.name.toLowerCase().endsWith(e))) f.name,
       ];
+      final urls = [for (final n in names) bucket.getPublicUrl(n)];
       if (!mounted) return;
-      setState(() { banners = urls; bannersLoading = false; if (bannerIdx >= urls.length) bannerIdx = 0; });
+      setState(() { banners = urls; bannerNames = names; bannersLoading = false; if (bannerIdx >= urls.length) bannerIdx = 0; });
       _startBannerTimer();
     } catch (_) {
       // dossier absent ou hors connexion : le carrousel reste simplement masqué
-      if (mounted) setState(() { banners = []; bannersLoading = false; });
+      if (mounted) setState(() { banners = []; bannerNames = []; bannersLoading = false; });
     }
   }
 
@@ -334,43 +336,97 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
       );
 
-  Widget _bannerSkeleton() => AspectRatio(
-        aspectRatio: 2.1,
-        child: Center(
-          child: FractionallySizedBox(
-            widthFactor: 0.92,
-            heightFactor: 1,
-            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Container(decoration: BoxDecoration(color: _line, borderRadius: BorderRadius.circular(16)))),
+  Widget _bannerSkeleton() => LayoutBuilder(
+        builder: (context, box) => SizedBox(
+          height: _bannerH(box.maxWidth),
+          child: Center(
+            child: FractionallySizedBox(
+              widthFactor: 0.92,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  AspectRatio(aspectRatio: 2.1, child: Container(decoration: BoxDecoration(color: _line, borderRadius: BorderRadius.circular(16)))),
+                  const SizedBox(height: 12),
+                  Container(width: 150, height: 14, decoration: BoxDecoration(color: _line, borderRadius: BorderRadius.circular(6))),
+                  const SizedBox(height: 8),
+                  Container(width: 220, height: 11, decoration: BoxDecoration(color: _line, borderRadius: BorderRadius.circular(6))),
+                ]),
+              ),
+            ),
           ),
         ),
       );
 
-  /// Carrousel de bannières (images du dossier Supabase), défilement automatique + points.
-  Widget _bannerCarousel() => Column(children: [
+  /// Textes affichés par défaut sur les bannières (ordre cyclique) : (titre FR, sous-titre FR, titre AR, sous-titre AR).
+  static const _bannerDefaults = [
+    ('Gagnez des points à chaque visite', 'Présentez votre QR chez nos commerçants partenaires', 'اكسب نقاطًا في كل زيارة', 'اعرض رمزك عند التجار الشركاء'),
+    ('Des récompenses près de chez vous', 'Échangez vos points contre des cadeaux et des réductions', 'مكافآت قريبة منك', 'استبدل نقاطك بهدايا وتخفيضات'),
+    ('Découvrez les offres du moment', 'Profitez des promotions de vos commerces préférés', 'اكتشف عروض الوقت', 'استفد من عروض متاجرك المفضلة'),
+    ('Invitez vos amis', 'Parrainez et gagnez des points ensemble', 'ادعُ أصدقاءك', 'أحِل أصدقاءك واكسبوا النقاط معًا'),
+  ];
+
+  /// Texte de la bannière i. Si le fichier s'appelle « 01__Titre__Sous-titre.jpg », on l'utilise
+  /// (le « _ » simple devient un espace) ; sinon, texte par défaut ci-dessus.
+  (String, String) _bannerText(int i) {
+    final n = i < bannerNames.length ? bannerNames[i] : '';
+    final base = n.contains('.') ? n.substring(0, n.lastIndexOf('.')) : n;
+    final parts = base.split('__');
+    if (parts.length >= 3) return (parts[1].replaceAll('_', ' ').trim(), parts[2].replaceAll('_', ' ').trim());
+    final d = _bannerDefaults[i % _bannerDefaults.length];
+    return (tr(d.$1, d.$3), tr(d.$2, d.$4));
+  }
+
+  /// Une diapo : l'image, puis le titre et le sous-titre juste en dessous (rien n'est écrit sur l'image).
+  Widget _bannerSlide(int i) {
+    final (title, sub) = _bannerText(i);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AspectRatio(
           aspectRatio: 2.1,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              color: _line,
+              child: Image.network(
+                banners[i],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                frameBuilder: (_, child, frame, sync) => sync ? child : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: const Duration(milliseconds: 350), curve: Curves.easeOut, child: child),
+                errorBuilder: (_, __, ___) => Container(alignment: Alignment.center, child: NIcon('tag', size: 36, color: _muted, accent: _gold)),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontSize: 16, fontWeight: FontWeight.w800, height: 1.2)),
+        ),
+        if (sub.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 3, 4, 0),
+            child: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 13, height: 1.3)),
+          ),
+      ]),
+    );
+  }
+
+  // hauteur réservée au texte sous l'image (titre 1 ligne + sous-titre 2 lignes)
+  static const double _bannerTextH = 76;
+  double _bannerH(double w) => (w * 0.92 - 8) / 2.1 + _bannerTextH; // image (ratio 2,1) + texte
+
+  /// Carrousel de bannières (images du dossier Supabase), défilement automatique + points.
+  Widget _bannerCarousel() => LayoutBuilder(builder: (context, box) => Column(children: [
+        SizedBox(
+          height: _bannerH(box.maxWidth),
           child: PageView.builder(
             controller: bannerPc,
             itemCount: banners.length,
             onPageChanged: (i) => setState(() => bannerIdx = i),
-            itemBuilder: (_, i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  color: _line,
-                  child: Image.network(
-                    banners[i],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    gaplessPlayback: true,
-                    frameBuilder: (_, child, frame, sync) => sync ? child : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: const Duration(milliseconds: 350), curve: Curves.easeOut, child: child),
-                    errorBuilder: (_, __, ___) => Container(alignment: Alignment.center, child: NIcon('tag', size: 36, color: _muted, accent: _gold)),
-                  ),
-                ),
-              ),
-            ),
+            itemBuilder: (_, i) => _bannerSlide(i),
           ),
         ),
         if (banners.length > 1)
@@ -387,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
             ]),
           ),
-      ]);
+      ]));
 
   /// Récompense disponible : carte sobre avec un filet jaune sur le côté.
   Widget _readyBanner(List<String> ready) => Pressable(
