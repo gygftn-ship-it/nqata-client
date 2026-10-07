@@ -13,7 +13,7 @@ import 'referral.dart';
 import 'tabs.dart';
 import 'wallet.dart';
 
-const supportEmail = 'support@nqata.app'; // ← remplacez par votre vraie adresse de support
+const supportEmail = 'opuspod917@gmail.com'; // adresse du support (utilisée par le chat de support et le bouton Contact)
 const appVersion = '0.1.0';
 
 const avatarColors = [Color(0xFF15120B), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
