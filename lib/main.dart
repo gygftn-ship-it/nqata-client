@@ -18,6 +18,7 @@ import 'nav.dart';
 import 'onboarding.dart';
 import 'notifs.dart';
 import 'push.dart';
+import 'splash.dart';
 import 'policy.dart';
 import 'profile.dart';
 import 'wallet.dart';
@@ -511,7 +512,7 @@ class NqataClient extends StatelessWidget {
           themeMode: store.themeMode,
           scrollBehavior: const BouncyScroll(),
           builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(textScaler: TextScaler.linear(store.textScale)), child: Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!)),
-          home: store.loggedIn ? const Shell() : const LoginPage(),
+          home: SplashGate(child: store.loggedIn ? const Shell() : const LoginPage()),
         ),
       );
 }
