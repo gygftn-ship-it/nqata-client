@@ -31,7 +31,7 @@ jobs:
       - name: Permission internet et nom de l'app
         run: |
           sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>\n    <application|' android/app/src/main/AndroidManifest.xml
-          sed -i 's|android:label="nqata_client"|android:label="Nqata"|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|android:label="nqata_client"|android:label="Nqate"|' android/app/src/main/AndroidManifest.xml
 
       - name: Empreinte digitale (l'activité principale doit être un FragmentActivity)
         run: |
@@ -69,4 +69,4 @@ jobs:
       - name: Publier l'APK dans Releases
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "client-${{ github.run_number }}" build/app/outputs/flutter-apk/app-release.apk --repo "${{ github.repository }}" --title "Nqata Client ${{ github.run_number }}" --notes "Version automatique"
+        run: gh release create "client-${{ github.run_number }}" build/app/outputs/flutter-apk/app-release.apk --repo "${{ github.repository }}" --title "Nqate Client ${{ github.run_number }}" --notes "Version automatique"
