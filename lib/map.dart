@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'nicons.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_vector_tiles/flutter_map_vector_tiles.dart' as vt;
 import 'package:latlong2/latlong.dart';
 import 'main.dart';
 import 'home.dart'; // Pressable
@@ -10,49 +11,59 @@ import 'shop.dart';
 import 'tabs.dart';
 
 // =====================================================================
-//  Fond de carte
+//  Fond de carte : OpenFreeMap (libre, sans clé, usage commercial autorisé)
 // =====================================================================
-/// Fournisseur du fond de carte. Deux options, au choix (voir les notes ci-dessous) :
-///
-/// 1) MapTiler (recommandé pour un rendu 100 % à vos couleurs) : créez un compte sur maptiler.com,
-///    collez votre clé dans [mapTilerKey]. Le plan gratuit est réservé à un usage non commercial ;
-///    l'usage commercial demande un plan payant. Dans l'éditeur de styles MapTiler, vous pouvez
-///    dupliquer un style et le teinter (jaune Nqata, encre chaude) : collez alors ses identifiants
-///    dans [mapTilerStyleLight] et [mapTilerStyleDark].
-/// 2) CARTO (par défaut tant que [mapTilerKey] est vide) : clé gratuite sur
-///    https://www.carto.com/basemaps/apikey/ à coller dans [cartoKey]. Prévue pour un usage non
-///    commercial ; au-delà, CARTO peut demander un accord commercial.
-const mapTilerKey = '';
-const mapTilerStyleLight = 'dataviz-light';
-const mapTilerStyleDark = 'dataviz-dark';
-const cartoKey = '';
+/// Styles vectoriels OpenFreeMap : clair ou sombre selon le thème de l'app.
+/// Aucune clé API, aucun compte, aucun quota. Voir https://openfreemap.org
+const _styleLight = 'https://tiles.openfreemap.org/styles/positron';
+const _styleDark = 'https://tiles.openfreemap.org/styles/dark';
 
-/// Fond de carte sobre, clair ou sombre selon le thème : utilisé par la carte et par la fiche commerce.
-TileLayer nqataTiles(BuildContext context) {
-  final dark = Theme.of(context).brightness == Brightness.dark;
-  final retina = RetinaMode.isHighDensity(context);
-  if (mapTilerKey.isNotEmpty) {
-    final id = dark ? mapTilerStyleDark : mapTilerStyleLight;
-    return TileLayer(
-      urlTemplate: 'https://api.maptiler.com/maps/$id/256/{z}/{x}/{y}{r}.png?key=$mapTilerKey',
-      retinaMode: retina,
-      userAgentPackageName: 'dz.nqata.client',
-      maxNativeZoom: 19,
-    );
-  }
-  final style = dark ? 'dark_all' : 'light_all';
-  final key = cartoKey.isEmpty ? '' : '?key=$cartoKey';
-  return TileLayer(
-    urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/$style/{z}/{x}/{y}{r}.png$key',
-    retinaMode: retina,
-    userAgentPackageName: 'dz.nqata.client',
-    maxNativeZoom: 19,
-  );
+// Chaque style n'est téléchargé qu'une fois (puis mis en cache sur le disque par le paquet).
+final Map<String, Future<vt.Style>> _styles = {};
+Future<vt.Style> _loadStyle(String uri) {
+  final f = _styles.putIfAbsent(uri, () => vt.StyleReader(uri: uri).read());
+  f.then((_) {}, onError: (_) => _styles.remove(uri)); // si le réseau a échoué, on pourra réessayer (sans erreur non gérée)
+  return f;
 }
 
-/// Mention obligatoire selon le fournisseur : à garder visible sur toutes les cartes.
-Widget get mapAttribution => SimpleAttributionWidget(
-      source: Text(mapTilerKey.isNotEmpty ? '© MapTiler · © OpenStreetMap contributors' : '© OpenStreetMap · © CARTO', style: const TextStyle(fontSize: 10.5, color: Colors.black87)),
+/// Fond de carte sobre, clair ou sombre selon le thème : utilisé par la carte et par la fiche commerce.
+/// À mettre dans `children` d'un FlutterMap, comme avant (même nom, même usage).
+Widget nqataTiles(BuildContext context) => _NqataBaseMap(dark: Theme.of(context).brightness == Brightness.dark);
+
+class _NqataBaseMap extends StatefulWidget {
+  final bool dark;
+  const _NqataBaseMap({required this.dark});
+  @override
+  State<_NqataBaseMap> createState() => _NqataBaseMapState();
+}
+
+class _NqataBaseMapState extends State<_NqataBaseMap> {
+  late Future<vt.Style> _style = _loadStyle(widget.dark ? _styleDark : _styleLight);
+
+  @override
+  void didUpdateWidget(_NqataBaseMap old) {
+    super.didUpdateWidget(old);
+    if (old.dark != widget.dark) _style = _loadStyle(widget.dark ? _styleDark : _styleLight);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // pendant le chargement (ou hors connexion sans cache) : fond uni aux couleurs de l'app
+    final bg = ColoredBox(color: widget.dark ? const Color(0xFF1B1912) : const Color(0xFFF6F3EA));
+    return FutureBuilder<vt.Style>(
+      future: _style,
+      builder: (_, snap) {
+        final st = snap.data;
+        if (st == null) return SizedBox.expand(child: bg);
+        return vt.VectorTileLayer(theme: st.theme, tileProviders: st.providers, rasterSources: st.rasterSources, sprites: st.sprites);
+      },
+    );
+  }
+}
+
+/// Mention obligatoire (licence OpenFreeMap / OpenMapTiles / OpenStreetMap) : à garder visible sur toutes les cartes.
+Widget get mapAttribution => const SimpleAttributionWidget(
+      source: Text('OpenFreeMap © OpenMapTiles · Data from OpenStreetMap', style: TextStyle(fontSize: 10.5, color: Colors.black87)),
     );
 
 const _cats = {
