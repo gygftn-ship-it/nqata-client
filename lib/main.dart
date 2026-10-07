@@ -730,7 +730,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final pages = [HomeScreen(goTo: (i) => setState(() => tab = i)), const MapTab(), const WalletTab(), const DiscoverTab(), const ProfileScreen()];
     return Scaffold(
       body: SafeArea(
-        top: tab != 4 && tab != 2, // Profil et Portefeuille dessinent eux-mêmes leur en-tête sous la barre d'état
+        top: tab != 4 && tab != 2 && tab != 3, // Profil, Portefeuille et Offres dessinent eux-mêmes leur en-tête sous la barre d'état
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(a), child: child)),
