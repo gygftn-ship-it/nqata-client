@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'extras.dart';
+import 'home.dart'; // Pressable
 import 'main.dart';
+import 'profile.dart'; // coverThemes
+import 'referral_banner.dart';
 import 'shop.dart';
+import 'style.dart';
 import 'tabs.dart';
 
 // ======================= Code PIN =======================
@@ -306,6 +310,48 @@ class _WalletTabState extends State<WalletTab> {
     return diff == 0 ? tr('Aujourd\'hui', 'اليوم') : diff == 1 ? tr('Hier', 'أمس') : '${d.day}/${d.month}/${d.year}';
   }
 
+  // ----- Expiration des points -----
+  static DateTime? _exp(Map<String, dynamic> row) {
+    final s = row['expires_at'] as String?;
+    if (s == null || (row['points'] as int) <= 0) return null;
+    return DateTime.tryParse(s)?.toLocal();
+  }
+
+  static String _dmy(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  static int _daysLeft(DateTime d) => d.difference(DateTime.now()).inDays;
+
+  /// Puce « Expire le … » (orange quand il reste 7 jours ou moins).
+  Widget _expChip(DateTime d) {
+    final left = _daysLeft(d);
+    final soon = left <= 7;
+    final text = left < 0
+        ? tr('Expiré', 'منتهية')
+        : left == 0
+            ? tr('Expire aujourd\'hui', 'تنتهي اليوم')
+            : soon
+                ? tr('Expire dans $left j', 'تنتهي بعد $left يوم')
+                : '${tr('Expire le', 'تنتهي في')} ${_dmy(d)}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: soon ? Colors.orange : Colors.white24, borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        NIcon('history', size: 13, color: soon ? Colors.black87 : Colors.white, accent: soon ? Colors.white : brandYellow),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(color: soon ? Colors.black87 : Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  static DateTime? _nextExp() {
+    DateTime? best;
+    for (final r in store.wallet) {
+      final d = _exp(r);
+      if (d != null && (best == null || d.isBefore(best))) best = d;
+    }
+    return best;
+  }
+
   Widget _circle(double s) => Container(width: s, height: s, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10));
 
   Widget _shell(List<Color> colors, Widget child) => AspectRatio(
@@ -342,6 +388,18 @@ class _WalletTabState extends State<WalletTab> {
           Row(children: [
             Text('NQATA', style: _white.copyWith(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 4)),
             const Spacer(),
+            if (store.referralPoints > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const NIcon('gift', size: 14, color: Colors.white, accent: brandYellow),
+                  const SizedBox(width: 4),
+                  Text('${store.referralPoints}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+              const SizedBox(width: 10),
+            ],
             const NIcon('nfc', color: Colors.white),
           ]),
           const Spacer(),
@@ -367,6 +425,9 @@ class _WalletTabState extends State<WalletTab> {
           Text('${store.wallet.length} ${tr('commerce(s) • ', 'متجر • ')}${store.rewardsReady.length} ${tr('récompense(s) prête(s)', 'مكافأة جاهزة')}', style: _white),
           const SizedBox(height: 6),
           Text('${tr('Mon code', 'رمزي')} : ${store.code}', style: _dim),
+          const SizedBox(height: 6),
+          Text('${tr('Points parrainage', 'نقاط الترشيح')} : ${store.referralPoints}', style: _dim),
+          if (_nextExp() != null) ...[const SizedBox(height: 6), Text('${tr('Prochaine expiration', 'أقرب انتهاء')} : ${_dmy(_nextExp()!)}', style: _dim)],
           const SizedBox(height: 6),
           Text(tr('Montrez le QR de l\'accueil pour gagner des points', 'اعرض رمز الرئيسية لكسب النقاط'), style: _dim.copyWith(fontSize: 12)),
         ]),
@@ -404,7 +465,7 @@ class _WalletTabState extends State<WalletTab> {
             ),
           const Spacer(),
           AnimatedCount(pts, style: _white.copyWith(fontSize: 40, fontWeight: FontWeight.bold)),
-          Text(tr('points', 'نقطة'), style: _dim),
+          Row(children: [Text(tr('points', 'نقطة'), style: _dim), const Spacer(), if (_exp(row) != null) _expChip(_exp(row)!)]),
           const SizedBox(height: 8),
           ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (pts % thr) / thr, minHeight: 7, backgroundColor: Colors.white24, color: Colors.white)),
           const SizedBox(height: 6),
@@ -425,6 +486,7 @@ class _WalletTabState extends State<WalletTab> {
           Text(tr('Prochaine récompense dans ${thr - pts % thr} points', 'المكافأة التالية بعد ${thr - pts % thr} نقطة'), style: _white),
           const SizedBox(height: 4),
           Text('${tr('Dernière visite', 'آخر زيارة')} : ${fmtDate(row['last_scan_at'] as String?)}', style: _dim),
+          if (_exp(row) != null) ...[const SizedBox(height: 4), Text('${tr('Expiration des points', 'انتهاء النقاط')} : ${_dmy(_exp(row)!)}', style: _dim)],
           if (shop != null)
             Align(
               alignment: AlignmentDirectional.centerStart,
@@ -440,23 +502,60 @@ class _WalletTabState extends State<WalletTab> {
   }
 
   Widget _pinBanner() => Container(
-        margin: const EdgeInsets.only(top: 6, bottom: 4),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: nTint(context), borderRadius: BorderRadius.circular(18)),
         child: Row(children: [
-          const NIcon('shield', color: brandLight),
+          NIcon('shield', color: nInk(context), accent: nGold(context)),
           const SizedBox(width: 12),
           Expanded(child: Text(tr('Protégez votre portefeuille avec un code PIN', 'احمِ محفظتك برمز PIN'))),
           TextButton(onPressed: () => setupPin(context), child: Text(tr('Activer', 'تفعيل'))),
         ]),
       );
 
+  Widget _lockButton() => Semantics(
+        button: true,
+        label: tr('Verrouiller', 'قفل'),
+        child: Pressable(
+          onTap: store.lock,
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.10), border: Border.all(color: Colors.white24)),
+            child: const NIcon('lock', size: 22, color: Colors.white, accent: brandYellow),
+          ),
+        ),
+      );
+
+  Widget _txTile(Map<String, dynamic> t) {
+    final reward = t['type'] == 'reward', undone = t['undone'] == true;
+    final amount = t['amount'] as int;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: nTint(context), borderRadius: BorderRadius.circular(18)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        leading: CircleAvatar(
+          backgroundColor: reward ? Colors.amber : (undone ? Colors.grey : Colors.green),
+          child: NIcon(reward ? 'gift' : (undone ? 'block' : 'add'), color: Colors.white),
+        ),
+        title: Text('${t['shop'] ?? ''}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        subtitle: Text(reward ? tr('Récompense utilisée', 'مكافأة مستخدمة') : (undone ? tr('Annulé', 'ملغى') : tr('Visite', 'زيارة')), style: TextStyle(fontSize: 12.5, color: nMuted(context))),
+        trailing: Text(
+          '${amount > 0 ? '+' : ''}$amount',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: reward ? Colors.orange : (undone ? Colors.grey : Colors.green), decoration: undone ? TextDecoration.lineThrough : null),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) {
-          if (store.hasPin && !store.unlocked) return const LockView();
+          if (store.hasPin && !store.unlocked) return const SafeArea(child: LockView());
           final theme = Theme.of(context);
+          final cv = coverThemes[store.coverTheme % coverThemes.length];
           final rows = [...store.wallet]..sort((a, b) => (b['points'] as int).compareTo(a['points'] as int));
           if (page > rows.length) page = 0;
           final shopId = page == 0 ? null : (rows[page - 1]['shops'] as Map?)?['id'];
@@ -465,85 +564,86 @@ class _WalletTabState extends State<WalletTab> {
             return filter == 'all' || (filter == 'gain' ? t['type'] == 'visit' : t['type'] == 'reward');
           }).take(30).toList();
           DateTime at(int i) => DateTime.parse('${txs[i]['at']}').toLocal();
-          return Container(
-            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brandYellow.withOpacity(0.3), theme.colorScheme.surface], stops: const [0, 0.55])),
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.light, // icônes de la barre d'état claires sur l'en-tête sombre
             child: RefreshIndicator(
               onRefresh: store.refresh,
-              child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.only(top: 16, bottom: 24), children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(tr('Mon portefeuille', 'محفظتي'), style: theme.textTheme.bodyMedium),
-                        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          AnimatedCount(store.total, style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
-                          Padding(padding: const EdgeInsets.only(bottom: 6, left: 6), child: Text(tr('points', 'نقطة'))),
-                        ]),
+              child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: EdgeInsets.zero, children: [
+                // ----- En-tête sombre (même thème que le profil) : total + cartes -----
+                Container(
+                  padding: EdgeInsets.fromLTRB(0, MediaQuery.of(context).padding.top + 14, 0, 14),
+                  decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [cv.$3, cv.$4])),
+                  child: Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(tr('Mon portefeuille', 'محفظتي'), style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                              AnimatedCount(store.total, style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, height: 1.15)),
+                              Padding(padding: const EdgeInsets.only(bottom: 6, left: 6, right: 6), child: Text(tr('points', 'نقطة'), style: const TextStyle(color: Colors.white70))),
+                            ]),
+                          ]),
+                        ),
+                        if (store.hasPin) _lockButton(),
                       ]),
                     ),
-                    if (store.hasPin) IconButton(icon: const NIcon('lock'), tooltip: tr('Verrouiller', 'قفل'), onPressed: store.lock),
-                  ]),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 240,
-                  child: PageView.builder(
-                    controller: pc,
-                    itemCount: rows.length + 1,
-                    onPageChanged: (i) { HapticFeedback.selectionClick(); setState(() => page = i); },
-                    itemBuilder: (_, i) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 16),
-                      child: Center(child: i == 0 ? _member() : _shopCard(rows[i - 1], i)),
-                    ),
-                  ),
-                ),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  for (var i = 0; i < rows.length + 1; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      margin: const EdgeInsets.all(3),
-                      width: page == i ? 20 : 7,
-                      height: 7,
-                      decoration: BoxDecoration(color: page == i ? brandLight : Colors.grey.shade400, borderRadius: BorderRadius.circular(4)),
-                    ),
-                ]),
-                Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Text(tr('Touchez une carte pour la retourner', 'المس البطاقة لقلبها'), style: const TextStyle(color: Colors.grey, fontSize: 12)))),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (!store.hasPin) _pinBanner(),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      Expanded(child: Text(page == 0 ? tr('Transactions', 'المعاملات') : '${tr('Transactions', 'المعاملات')} · ${(rows[page - 1]['shops'] as Map?)?['name'] ?? ''}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                      TextButton(onPressed: () => Navigator.push(context, smoothRoute(const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
-                    ]),
-                    Wrap(spacing: 8, children: [
-                      for (final f in const [('all', 'Tout', 'الكل'), ('gain', 'Gains', 'الأرباح'), ('reward', 'Récompenses', 'المكافآت')])
-                        ChoiceChip(label: Text(tr(f.$2, f.$3)), selected: filter == f.$1, onSelected: (_) => setState(() => filter = f.$1)),
-                    ]),
-                    if (txs.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 28), child: Center(child: Text(tr('Aucune transaction pour le moment', 'لا توجد معاملات حاليًا')))),
-                    for (var i = 0; i < txs.length; i++) ...[
-                      if (i == 0 || _day(at(i)) != _day(at(i - 1)))
-                        Padding(padding: const EdgeInsets.only(top: 14, bottom: 2), child: Text(_day(at(i)), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600))),
-                      FadeSlideIn(
-                        index: i,
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundColor: txs[i]['type'] == 'reward' ? Colors.amber : (txs[i]['undone'] == true ? Colors.grey : Colors.green),
-                            child: NIcon(txs[i]['type'] == 'reward' ? 'gift' : (txs[i]['undone'] == true ? 'block' : 'add'), color: Colors.white),
-                          ),
-                          title: Text('${txs[i]['shop'] ?? ''}'),
-                          subtitle: Text(txs[i]['type'] == 'reward' ? tr('Récompense utilisée', 'مكافأة مستخدمة') : (txs[i]['undone'] == true ? tr('Annulé', 'ملغى') : tr('Visite', 'زيارة'))),
-                          trailing: Text(
-                            '${(txs[i]['amount'] as int) > 0 ? '+' : ''}${txs[i]['amount']}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: txs[i]['type'] == 'reward' ? Colors.orange : (txs[i]['undone'] == true ? Colors.grey : Colors.green), decoration: txs[i]['undone'] == true ? TextDecoration.lineThrough : null),
-                          ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 240,
+                      child: PageView.builder(
+                        controller: pc,
+                        itemCount: rows.length + 1,
+                        onPageChanged: (i) { HapticFeedback.selectionClick(); setState(() => page = i); },
+                        itemBuilder: (_, i) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 16),
+                          child: Center(child: i == 0 ? _member() : _shopCard(rows[i - 1], i)),
                         ),
                       ),
-                    ],
+                    ),
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      for (var i = 0; i < rows.length + 1; i++)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.all(3),
+                          width: page == i ? 20 : 7,
+                          height: 7,
+                          decoration: BoxDecoration(color: page == i ? brandYellow : Colors.white30, borderRadius: BorderRadius.circular(4)),
+                        ),
+                    ]),
+                    Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr('Touchez une carte pour la retourner', 'المس البطاقة لقلبها'), style: const TextStyle(color: Colors.white54, fontSize: 12))),
                   ]),
+                ),
+                // ----- Feuille claire aux coins arrondis -----
+                Container(
+                  color: cv.$4,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
+                    decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(28))),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      FadeSlideIn(child: const ReferralBanner()),
+                      if (!store.hasPin) Padding(padding: const EdgeInsets.only(top: 14), child: _pinBanner()),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 22, bottom: 4),
+                        child: Row(children: [
+                          Expanded(child: Text(page == 0 ? tr('Transactions', 'المعاملات') : '${tr('Transactions', 'المعاملات')} · ${(rows[page - 1]['shops'] as Map?)?['name'] ?? ''}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: lang == 'ar' ? 0 : -0.2), overflow: TextOverflow.ellipsis)),
+                          TextButton(onPressed: () => Navigator.push(context, smoothRoute(const HistoryPage())), child: Text(tr('Voir tout', 'عرض الكل'))),
+                        ]),
+                      ),
+                      Wrap(spacing: 8, children: [
+                        for (final f in const [('all', 'Tout', 'الكل'), ('gain', 'Gains', 'الأرباح'), ('reward', 'Récompenses', 'المكافآت')])
+                          ChoiceChip(label: Text(tr(f.$2, f.$3)), selected: filter == f.$1, backgroundColor: nTint(context), side: BorderSide.none, onSelected: (_) => setState(() => filter = f.$1)),
+                      ]),
+                      if (txs.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 28), child: Center(child: Text(tr('Aucune transaction pour le moment', 'لا توجد معاملات حاليًا'), style: TextStyle(color: nMuted(context))))),
+                      for (var i = 0; i < txs.length; i++) ...[
+                        if (i == 0 || _day(at(i)) != _day(at(i - 1)))
+                          Padding(padding: const EdgeInsets.only(top: 16, bottom: 8), child: Text(_day(at(i)), style: TextStyle(color: nMuted(context), fontWeight: FontWeight.w600))),
+                        FadeSlideIn(index: i, child: _txTile(txs[i])),
+                      ],
+                    ]),
+                  ),
                 ),
               ]),
             ),
