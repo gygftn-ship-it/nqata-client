@@ -18,6 +18,16 @@ const appVersion = '0.1.0';
 
 const avatarColors = [Color(0xFF15120B), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
 
+/// Thèmes d'en-tête du profil : (nom FR, nom AR, haut du dégradé, bas du dégradé).
+const coverThemes = [
+  ('Or', 'ذهبي', Color(0xFF15120B), Color(0xFF2B2108)),
+  ('Violet', 'بنفسجي', Color(0xFF1B0F33), Color(0xFF3B1A78)),
+  ('Océan', 'محيط', Color(0xFF0B1B30), Color(0xFF14407A)),
+  ('Forêt', 'غابة', Color(0xFF0A2219), Color(0xFF0F5C4F)),
+  ('Rose', 'وردي', Color(0xFF2A0A1C), Color(0xFF8E1A52)),
+  ('Graphite', 'رمادي', Color(0xFF0E0E10), Color(0xFF2F3440)),
+];
+
 /// Niveau de fidélité selon le nombre de visites (utilisé aussi par l'accueil).
 Map<String, dynamic> levelInfo() {
   final v = store.txs.where((t) => t['type'] == 'visit' && t['undone'] != true).length;
@@ -29,8 +39,6 @@ Map<String, dynamic> levelInfo() {
 // =====================================================================
 //  Style commun
 // =====================================================================
-const _hdrEnd = Color(0xFF2B2108); // bas du dégradé de l'en-tête (noir chaud → or foncé)
-
 bool _isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
 Color _ink(BuildContext c) => Theme.of(c).colorScheme.onSurface;
 Color _line(BuildContext c) => _ink(c).withOpacity(_isDark(c) ? 0.14 : 0.10);
@@ -135,52 +143,94 @@ void _info(BuildContext context, String title, String body) => showDialog(
 
 Future<void> _editProfile(BuildContext context) async {
   final c = TextEditingController(text: store.name);
-  var color = store.avatarColor;
+  var color = store.avatarColor % avatarColors.length;
+  var avatarId = store.avatarId;
+  var cover = store.coverTheme % coverThemes.length;
+  final initial = store.name.isEmpty ? '?' : store.name[0].toUpperCase();
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     builder: (sheet) => StatefulBuilder(
-      builder: (_, set) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(sheet).viewInsets.bottom + 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(tr('Informations personnelles', 'المعلومات الشخصية'), style: Theme.of(sheet).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextField(controller: c, decoration: InputDecoration(labelText: tr('Prénom ou pseudo', 'الاسم'), border: const OutlineInputBorder())),
-          const SizedBox(height: 16),
-          Text(tr('Couleur de l\'avatar', 'لون الصورة الرمزية')),
-          const SizedBox(height: 10),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            for (var i = 0; i < avatarColors.length; i++)
-              GestureDetector(
-                onTap: () { HapticFeedback.selectionClick(); set(() => color = i); },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: avatarColors[i], shape: BoxShape.circle, border: Border.all(color: color == i ? Colors.black87 : Colors.transparent, width: 3)),
-                  child: color == i ? const NIcon('check', color: Colors.white) : null,
+      builder: (_, set) {
+        final onSurface = Theme.of(sheet).colorScheme.onSurface;
+        Widget label(String t) => Padding(padding: const EdgeInsets.only(top: 20, bottom: 10), child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)));
+        Widget dot({required bool on, required VoidCallback tap, Color? fill, Gradient? grad, Widget? child}) => GestureDetector(
+              onTap: () { HapticFeedback.selectionClick(); tap(); },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: fill, gradient: grad, border: Border.all(color: on ? onSurface : Colors.transparent, width: 3)),
+                child: child,
+              ),
+            );
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(sheet).viewInsets.bottom + 20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('Personnaliser mon profil', 'تخصيص ملفي'), style: Theme.of(sheet).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Center(child: NAvatar(id: avatarId, initial: initial, color: avatarColors[color], size: 84)),
+              const SizedBox(height: 16),
+              TextField(controller: c, decoration: InputDecoration(labelText: tr('Prénom ou pseudo', 'الاسم'), border: const OutlineInputBorder())),
+              label(tr('Avatar', 'الصورة الرمزية')),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final id in ['', ...avatarIds])
+                  GestureDetector(
+                    onTap: () { HapticFeedback.selectionClick(); set(() => avatarId = id); },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: avatarId == id ? onSurface : Colors.transparent, width: 3)),
+                      child: NAvatar(id: id, initial: initial, color: avatarColors[color], size: 52),
+                    ),
+                  ),
+              ]),
+              // la couleur ne sert qu'au fond de l'initiale
+              if (avatarId.isEmpty) ...[
+                label(tr('Couleur de l\'initiale', 'لون الحرف')),
+                Wrap(spacing: 10, runSpacing: 10, children: [
+                  for (var i = 0; i < avatarColors.length; i++)
+                    dot(on: color == i, tap: () => set(() => color = i), fill: avatarColors[i], child: color == i ? const NIcon('check', color: Colors.white) : null),
+                ]),
+              ],
+              label(tr('Thème de l\'en-tête', 'لون الواجهة العلوية')),
+              Wrap(spacing: 10, runSpacing: 10, children: [
+                for (var i = 0; i < coverThemes.length; i++)
+                  dot(
+                    on: cover == i,
+                    tap: () => set(() => cover = i),
+                    grad: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [coverThemes[i].$3, coverThemes[i].$4]),
+                    child: cover == i ? const NIcon('check', color: Colors.white) : null,
+                  ),
+              ]),
+              const SizedBox(height: 6),
+              Text(tr(coverThemes[cover].$1, coverThemes[cover].$2), style: TextStyle(fontSize: 12, color: onSurface.withOpacity(0.62))),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    final n = c.text.trim();
+                    try {
+                      if (n.isNotEmpty && n != store.name) await store.rename(n);
+                      store.setAvatarColor(color);
+                      store.setAvatarId(avatarId);
+                      store.setCoverTheme(cover);
+                      if (sheet.mounted) Navigator.pop(sheet);
+                    } catch (err) {
+                      _snack(context, errText(err));
+                    }
+                  },
+                  child: Text(tr('Enregistrer', 'حفظ')),
                 ),
               ),
-          ]),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () async {
-                final n = c.text.trim();
-                try {
-                  if (n.isNotEmpty && n != store.name) await store.rename(n);
-                  store.setAvatarColor(color);
-                  if (sheet.mounted) Navigator.pop(sheet);
-                } catch (e) {
-                  _snack(context, errText(e));
-                }
-              },
-              child: Text(tr('Enregistrer', 'حفظ')),
-            ),
+            ]),
           ),
-        ]),
-      ),
+        );
+      },
     ),
   );
 }
@@ -243,24 +293,58 @@ void _export(BuildContext context) {
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  /// Bouton « ⚙ Paramètres » : icône + texte, pour qu'on comprenne tout de suite à quoi il sert.
+  Widget _settingsButton(BuildContext c) => Semantics(
+        button: true,
+        label: tr('Paramètres', 'الإعدادات'),
+        child: Pressable(
+          onTap: () => Navigator.push(c, smoothRoute(const SettingsPage())),
+          child: Container(
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 9, 16, 9),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white30)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const NIcon('settings', size: 20, color: Colors.white, accent: brandYellow),
+              const SizedBox(width: 8),
+              Text(tr('Paramètres', 'الإعدادات'), style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      );
+
   Widget _header(BuildContext c, Map<String, dynamic> lv) {
     final lvColor = lv['color'] as Color;
+    final cv = coverThemes[store.coverTheme % coverThemes.length];
     return Container(
       padding: EdgeInsets.fromLTRB(20, MediaQuery.of(c).padding.top + 14, 20, 22),
-      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [brandDark, _hdrEnd])),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [cv.$3, cv.$4])),
       child: Column(children: [
+        Row(children: [
+          Expanded(child: Text(tr('Profil', 'الملف'), style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: lang == 'ar' ? 0 : -0.4))),
+          _settingsButton(c),
+        ]),
+        const SizedBox(height: 18),
         Row(children: [
           GestureDetector(
             onTap: () => _editProfile(c),
-            child: Container(
-              padding: const EdgeInsets.all(2.5),
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: lvColor, width: 2)),
-              child: CircleAvatar(
-                radius: 28,
-                backgroundColor: avatarColors[store.avatarColor % avatarColors.length],
-                child: Text(store.name.isEmpty ? '?' : store.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600)),
+            child: Stack(children: [
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: lvColor, width: 2)),
+                child: NAvatar(id: store.avatarId, size: 60, color: avatarColors[store.avatarColor % avatarColors.length], initial: store.name.isEmpty ? '?' : store.name[0].toUpperCase()),
               ),
-            ),
+              // petit crayon : indique que l'avatar se personnalise en le touchant
+              PositionedDirectional(
+                end: 0,
+                bottom: 0,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: brandYellow, shape: BoxShape.circle, border: Border.all(color: cv.$4, width: 2)),
+                  child: const NIcon('edit', size: 12, color: Colors.black87, accent: Colors.black87),
+                ),
+              ),
+            ]),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -276,8 +360,6 @@ class ProfileScreen extends StatelessWidget {
               Text(store.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13.5)),
             ]),
           ),
-          const SizedBox(width: 8),
-          _roundBtn(c, 'settings', tr('Paramètres', 'الإعدادات'), () => Navigator.push(c, smoothRoute(const SettingsPage())), onDark: true),
         ]),
         const SizedBox(height: 20),
         _levelBanner(lv),
@@ -355,7 +437,7 @@ class ProfileScreen extends StatelessWidget {
               FadeSlideIn(child: _header(context, lv)),
               // le fond sombre n'apparaît que derrière les coins arrondis de la feuille
               Container(
-                color: _hdrEnd,
+                color: coverThemes[store.coverTheme % coverThemes.length].$4,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(16, 22, 16, 28),
@@ -375,7 +457,7 @@ class ProfileScreen extends StatelessWidget {
                     FadeSlideIn(
                       index: 2,
                       child: _group(context, [
-                        _row(context, 'user', tr('Informations personnelles', 'المعلومات الشخصية'), onTap: () => _editProfile(context)),
+                        _row(context, 'user', tr('Personnaliser mon profil', 'تخصيص ملفي'), subtitle: tr('Nom, avatar et couleurs', 'الاسم والصورة والألوان'), onTap: () => _editProfile(context)),
                         _row(context, 'hash', tr('Mon code client', 'رمز الزبون'), subtitle: store.code.isEmpty ? '—' : store.code, trailing: NIcon('copy', size: 20, color: _ink(context), accent: _gold(context)), onTap: () {
                           if (store.code.isEmpty) return;
                           Clipboard.setData(ClipboardData(text: store.code));
