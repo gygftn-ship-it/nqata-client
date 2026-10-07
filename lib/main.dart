@@ -39,6 +39,7 @@ String errText(Object e) {
   if (m.contains('confirm_email')) return tr('Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول');
   if (m.contains('rate limit')) return tr('Trop d\'e-mails envoyés, réessayez plus tard', 'رسائل كثيرة، حاول لاحقًا');
   if (m.contains('not_visited')) return tr('Visitez ce commerce avant de le noter', 'زر هذا المتجر قبل تقييمه');
+  if (m.contains('already registered') || m.contains('already been registered')) return tr('Cet e-mail est déjà utilisé : connectez-vous', 'هذا البريد مستخدم بالفعل: سجّل الدخول');
   if (m.contains('already_referred')) return tr('Vous avez déjà un parrain', 'لديك راعٍ بالفعل');
   if (m.contains('referral_too_late')) return tr('Trop tard : vous avez déjà visité un commerce', 'فات الأوان: زرت متجرًا بالفعل');
   if (m.contains('code_not_found')) return tr('Code introuvable', 'الرمز غير موجود');
@@ -436,9 +437,12 @@ class Store extends ChangeNotifier {
     await start();
   }
 
-  Future<void> signUp(String e, String p, String n) async {
-    final r = await sb.auth.signUp(email: e, password: p, data: {'display_name': n.isEmpty ? 'Client' : n});
-    if (r.session == null) throw 'confirm_email';
+  Future<void> signUp(String e, String p, String n, {String phone = ''}) async {
+    final r = await sb.auth.signUp(email: e, password: p, data: {'display_name': n.isEmpty ? 'Client' : n, if (phone.isNotEmpty) 'phone': phone});
+    if (r.session == null) throw 'confirm_email'; // la confirmation e-mail est encore activée dans Supabase
+    if (phone.isNotEmpty) {
+      try { await sb.from('profiles').update({'phone': phone}).eq('id', uid); } catch (_) {} // sans bloquer l'inscription
+    }
     await start();
   }
 
@@ -520,70 +524,155 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final name = TextEditingController(), email = TextEditingController(), pass = TextEditingController();
-  bool signup = false, busy = false;
+  final name = TextEditingController(), email = TextEditingController(), phone = TextEditingController(), pass = TextEditingController(), pass2 = TextEditingController();
+  bool signup = false, busy = false, accepted = false;
   String? error;
 
   @override
-  void dispose() { name.dispose(); email.dispose(); pass.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); email.dispose(); phone.dispose(); pass.dispose(); pass2.dispose(); super.dispose(); }
+
+  /// Vérifie le formulaire d'inscription ; renvoie un message d'erreur, ou null si tout est bon.
+  String? _validateSignup() {
+    final digits = phone.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (name.text.trim().length < 2) return tr('Entrez votre prénom ou pseudo', 'أدخل اسمك');
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim())) return tr('Adresse e-mail invalide', 'بريد إلكتروني غير صالح');
+    if (digits.length < 9 || digits.length > 13) return tr('Numéro de téléphone invalide', 'رقم هاتف غير صالح');
+    if (pass.text.length < 6) return tr('Le mot de passe doit avoir 6 caractères minimum', 'كلمة السر 6 أحرف على الأقل');
+    if (pass.text != pass2.text) return tr('Les mots de passe ne correspondent pas', 'كلمتا السر غير متطابقتين');
+    if (!accepted) return tr('Acceptez la politique de confidentialité pour continuer', 'وافق على سياسة الخصوصية للمتابعة');
+    return null;
+  }
 
   Future<void> _submit() async {
+    if (signup) {
+      final err = _validateSignup();
+      if (err != null) { setState(() => error = err); return; }
+    }
     setState(() { busy = true; error = null; });
     try {
       final e = email.text.trim();
-      signup ? await store.signUp(e, pass.text, name.text.trim()) : await store.signIn(e, pass.text);
+      if (signup) {
+        await store.signUp(e, pass.text, name.text.trim(), phone: phone.text.replaceAll(RegExp(r'[^0-9+]'), ''));
+      } else {
+        await store.signIn(e, pass.text);
+      }
     } catch (err) {
       if (mounted) setState(() => error = errText(err));
     }
     if (mounted) setState(() => busy = false);
   }
 
-  Widget _f(TextEditingController c, String l, {bool secret = false, TextInputType? type}) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, obscureText: secret, keyboardType: type, decoration: InputDecoration(labelText: l, border: const OutlineInputBorder())),
-      );
+  /// Champ avec son libellé au-dessus (style de la maquette) : bords arrondis, icône à gauche.
+  Widget _f(TextEditingController c, String label, String hint, String icon, {bool secret = false, TextInputType? type}) {
+    final ink = Theme.of(context).colorScheme.onSurface;
+    OutlineInputBorder border(Color col, double w) => OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: col, width: w));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: c,
+          obscureText: secret,
+          keyboardType: type,
+          autocorrect: false,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: ink.withOpacity(0.4)),
+            prefixIcon: Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: NIcon(icon, size: 22, color: ink, accent: brandLight)),
+            prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 24),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            enabledBorder: border(ink.withOpacity(0.18), 1),
+            focusedBorder: border(ink, 1.8),
+            border: border(ink.withOpacity(0.18), 1),
+          ),
+        ),
+      ]),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: brandYellow,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Stack(children: [
-              SizedBox(height: 270, width: double.infinity, child: Image.asset('mascot_hero.jpg', fit: BoxFit.cover, alignment: const Alignment(0.3, -0.1))),
-              Padding(
-                padding: const EdgeInsets.only(top: 236),
-                child: Container(
-                  width: double.infinity,
-                  constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height - 280),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(32))),
-                  child: Column(children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Image.asset('coin.png', width: 36, height: 36),
-                      const SizedBox(width: 10),
-                      const Text('NQATA', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3)),
-                    ]),
-                    const SizedBox(height: 16),
-                    if (signup) _f(name, tr('Prénom ou pseudo', 'الاسم')),
-                    _f(email, 'E-mail', type: TextInputType.emailAddress),
-                    _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
-                    if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: busy ? null : _submit,
-                        child: busy ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
-                      ),
-                    ),
-                    TextButton(onPressed: () => setState(() { signup = !signup; error = null; }), child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل'))),
-                    TextButton(onPressed: () => Navigator.push(context, smoothRoute(const PolicyPage())), child: Text(tr('Politique de confidentialité', 'سياسة الخصوصية'), style: const TextStyle(fontSize: 12))),
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withOpacity(0.62);
+    return Scaffold(
+      backgroundColor: brandYellow,
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark, // icônes de la barre d'état sombres sur le fond jaune
+        child: SingleChildScrollView(
+          child: Stack(children: [
+            // ----- Haut : logo + mascotte sur fond jaune -----
+            Column(children: [
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Image.asset('coin.png', width: 36, height: 36),
+                    const SizedBox(width: 10),
+                    const Text('NQATA', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3, color: brandDark)),
                   ]),
                 ),
               ),
+              SizedBox(height: 260, width: double.infinity, child: Image.asset('mascot_hero.jpg', fit: BoxFit.cover, alignment: const Alignment(0.3, -0.1))),
             ]),
-          ),
+            // ----- Bas : zone blanche bombée en haut -----
+            Padding(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 14 + 36 + 210),
+              child: Container(
+                width: double.infinity,
+                constraints: BoxConstraints(minHeight: size.height - 300),
+                padding: const EdgeInsets.fromLTRB(24, 44, 24, 24),
+                decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.vertical(top: Radius.elliptical(size.width, 120))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text(
+                    signup ? tr('Rejoignez Nqata', 'انضم إلى نقطة') : tr('Vos points, partout !', 'نقاطك في كل مكان!'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: lang == 'ar' ? 0 : -0.4),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    tr('Cumulez des points à chaque visite et profitez de récompenses chez vos commerces préférés.', 'اجمع النقاط في كل زيارة واستمتع بمكافآت في متاجرك المفضلة.'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, height: 1.4, color: muted),
+                  ),
+                  const SizedBox(height: 28),
+                  if (signup) _f(name, tr('Prénom ou pseudo', 'الاسم'), tr('Ex. Karim', 'مثال: كريم'), 'user'),
+                  _f(email, tr('Adresse e-mail', 'البريد الإلكتروني'), 'exemple@mail.com', 'at', type: TextInputType.emailAddress),
+                  if (signup) _f(phone, tr('Numéro de téléphone', 'رقم الهاتف'), '+213 5XX XX XX XX', 'support', type: TextInputType.phone),
+                  _f(pass, tr('Mot de passe', 'كلمة السر'), tr('6 caractères minimum', '6 أحرف على الأقل'), 'password', secret: true),
+                  if (signup) _f(pass2, tr('Confirmer le mot de passe', 'تأكيد كلمة السر'), tr('Retapez le mot de passe', 'أعد كتابة كلمة السر'), 'password', secret: true),
+                  if (signup)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(children: [
+                        Checkbox(value: accepted, onChanged: (v) => setState(() { accepted = v ?? false; error = null; })),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => Navigator.push(context, smoothRoute(const PolicyPage())),
+                            child: Text(tr('J\'accepte la politique de confidentialité', 'أوافق على سياسة الخصوصية'), style: const TextStyle(fontSize: 13.5, decoration: TextDecoration.underline)),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+                  FilledButton(
+                    onPressed: busy ? null : _submit,
+                    style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                    child: busy ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton(onPressed: () => setState(() { signup = !signup; error = null; }), child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل'))),
+                  TextButton(onPressed: () => Navigator.push(context, smoothRoute(const PolicyPage())), child: Text(tr('Politique de confidentialité', 'سياسة الخصوصية'), style: const TextStyle(fontSize: 12))),
+                ]),
+              ),
+            ),
+          ]),
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ---------- Coque : 5 onglets ----------
