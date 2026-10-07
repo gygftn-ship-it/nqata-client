@@ -14,7 +14,7 @@ import 'tabs.dart';
 import 'wallet.dart';
 
 const supportEmail = 'opuspod917@gmail.com'; // adresse du support (utilisée par le chat de support et le bouton Contact)
-const appVersion = '0.1.0';
+const appVersion = '0.7.6';
 
 const avatarColors = [Color(0xFF15120B), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF59E0B), Color(0xFF3B82F6), Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF475569)];
 
@@ -266,7 +266,7 @@ Future<void> _changePassword(BuildContext context) async {
 }
 
 Future<void> _contactSupport(BuildContext context) async {
-  final uri = Uri(scheme: 'mailto', path: supportEmail, queryParameters: {'subject': 'Nqata – ${store.name}', 'body': '\n\n---\n${store.email} · ${store.code}'});
+  final uri = Uri(scheme: 'mailto', path: supportEmail, queryParameters: {'subject': 'Nqate – ${store.name}', 'body': '\n\n---\n${store.email} · ${store.code}'});
   try {
     if (await launchUrl(uri)) return;
   } catch (_) {}
@@ -582,7 +582,7 @@ class SettingsPage extends StatelessWidget {
                   _row(context, 'download', tr('Exporter mes données', 'تصدير بياناتي'), subtitle: tr('Copie votre compte, vos points et vos transactions', 'ينسخ حسابك ونقاطك ومعاملاتك'), onTap: () => _export(context)),
                   _row(context, 'shield', tr('Politique de confidentialité', 'سياسة الخصوصية'), onTap: () => Navigator.push(context, smoothRoute(const PolicyPage()))),
                   _row(context, 'doc', tr('Conditions d\'utilisation', 'شروط الاستخدام'), onTap: () => _info(context, tr('Conditions d\'utilisation', 'شروط الاستخدام'), tr(
-                    'Nqata est un service de cartes de fidélité entre des clients et des commerces partenaires. Les points appartiennent au programme de chaque commerce, qui peut en fixer les règles (points par visite, seuil de récompense). Vous êtes responsable de la confidentialité de vos identifiants et de votre code PIN. Ces conditions sont provisoires et seront complétées avant la publication.',
+                    'Nqate est un service de cartes de fidélité entre des clients et des commerces partenaires. Les points appartiennent au programme de chaque commerce, qui peut en fixer les règles (points par visite, seuil de récompense). Vous êtes responsable de la confidentialité de vos identifiants et de votre code PIN. Ces conditions sont provisoires et seront complétées avant la publication.',
                     'نقطة خدمة بطاقات ولاء بين الزبائن والمتاجر الشريكة. النقاط تابعة لبرنامج كل متجر الذي يحدد قواعده (نقاط الزيارة، حد المكافأة). أنت مسؤول عن سرية بيانات دخولك ورمز PIN. هذه الشروط مؤقتة وسيتم استكمالها قبل النشر.'))),
                 ]),
               ),
@@ -590,8 +590,8 @@ class SettingsPage extends StatelessWidget {
               FadeSlideIn(
                 index: 5,
                 child: _group(context, [
-                  _row(context, 'info', 'Nqata', subtitle: '${tr('Version', 'الإصدار')} $appVersion'),
-                  _row(context, 'doc', tr('Licences', 'التراخيص'), onTap: () => showLicensePage(context: context, applicationName: 'Nqata', applicationVersion: appVersion)),
+                  _row(context, 'info', 'Nqate', subtitle: '${tr('Version', 'الإصدار')} $appVersion'),
+                  _row(context, 'doc', tr('Licences', 'التراخيص'), onTap: () => showLicensePage(context: context, applicationName: 'Nqate', applicationVersion: appVersion)),
                 ]),
               ),
               _title(context, tr('Compte', 'الحساب')),
@@ -617,7 +617,7 @@ class SettingsPage extends StatelessWidget {
                 ]),
               ),
               const SizedBox(height: 24),
-              Center(child: Text('Nqata $appVersion', style: TextStyle(color: _muted(context), fontSize: 12))),
+              Center(child: Text('Nqate $appVersion', style: TextStyle(color: _muted(context), fontSize: 12))),
             ]),
           ),
         ),
