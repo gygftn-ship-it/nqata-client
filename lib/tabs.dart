@@ -553,7 +553,7 @@ class ProfileTab extends StatelessWidget {
         builder: (d) => AlertDialog(
           title: Text(tr('Confidentialité', 'الخصوصية')),
           content: Text(tr(
-            'Nqata ne conserve que votre prénom ou pseudo et votre e-mail. Les commerçants voient seulement votre pseudo, votre solde et vos visites chez eux. Vous pouvez supprimer votre compte et toutes vos données à tout moment depuis cet écran.',
+            'Nqate ne conserve que votre prénom ou pseudo et votre e-mail. Les commerçants voient seulement votre pseudo, votre solde et vos visites chez eux. Vous pouvez supprimer votre compte et toutes vos données à tout moment depuis cet écran.',
             'تحتفظ نقطة فقط باسمك أو لقبك وبريدك الإلكتروني. يرى التجار لقبك ورصيدك وزياراتك لديهم فقط. يمكنك حذف حسابك وكل بياناتك في أي وقت من هذه الشاشة.')),
           actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))],
         ),
@@ -591,7 +591,7 @@ class ProfileTab extends StatelessWidget {
             onTap: () => _delete(context),
           ),
           const SizedBox(height: 16),
-          const Center(child: Text('Nqata 0.1.0', style: TextStyle(color: Colors.grey))),
+          const Center(child: Text('Nqate 0.7.6', style: TextStyle(color: Colors.grey))),
         ]),
       );
 }
