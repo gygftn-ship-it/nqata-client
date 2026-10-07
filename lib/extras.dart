@@ -5,8 +5,6 @@ import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'style.dart';
-import 'profile.dart' show supportEmail; // adresse du support, définie dans profile.dart
-import 'package:url_launcher/url_launcher.dart';
 
 // ---------- Historique complet : visites et récompenses utilisées ----------
 class HistoryPage extends StatefulWidget {
@@ -186,7 +184,7 @@ class _ConfettiPainter extends CustomPainter {
   bool shouldRepaint(_ConfettiPainter old) => old.t != t;
 }
 
-// ---------- Support : chat qui envoie un e-mail à l'équipe ----------
+// ---------- Support : interface de chat (réponse automatique en dur) ----------
 class SupportChatPage extends StatefulWidget {
   const SupportChatPage({super.key});
   @override
@@ -226,25 +224,12 @@ class _SupportChatPageState extends State<SupportChatPage> {
       input.clear();
     });
     _toEnd();
-    final body = '$text\n\n—\n${tr('Client', 'الزبون')} : ${store.name}\nCode : ${store.code}\nE-mail : ${store.email}';
-    final uri = Uri.parse('mailto:$supportEmail?subject=${Uri.encodeComponent('Support Nqata')}&body=${Uri.encodeComponent(body)}');
-    var ok = false;
-    try {
-      ok = await launchUrl(uri);
-    } catch (_) {}
-    if (!ok) Clipboard.setData(const ClipboardData(text: supportEmail));
-    await Future.delayed(const Duration(milliseconds: 400));
+    // Interface de test : réponse automatique écrite en dur, aucun e-mail n'est envoyé pour l'instant.
+    await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
     setState(() {
       sending = false;
-      msgs.add((
-        false,
-        ok
-            ? tr('Merci ! Vous recevrez une réponse de notre équipe par e-mail. Si votre application e-mail vient de s\'ouvrir, appuyez sur « Envoyer » pour nous transmettre votre message.',
-                'شكرًا! ستصلك إجابة فريقنا عبر البريد الإلكتروني. إذا فُتح تطبيق البريد، اضغط «إرسال» لإرسال رسالتك.')
-            : tr('Aucune application e-mail trouvée. Écrivez-nous à $supportEmail (adresse copiée) : nous vous répondrons par e-mail.',
-                'لم يتم العثور على تطبيق بريد. راسلنا على $supportEmail (تم نسخ العنوان) وسنردّ عليك عبر البريد.'),
-      ));
+      msgs.add((false, tr('Merci ! Vous recevrez une réponse de notre équipe par e-mail.', 'شكرًا! ستصلك إجابة فريقنا عبر البريد الإلكتروني.')));
     });
     _toEnd();
   }
