@@ -15,6 +15,7 @@ import 'map.dart';
 import 'tabs.dart';
 import 'home.dart';
 import 'nav.dart';
+import 'onboarding.dart';
 import 'notifs.dart';
 import 'push.dart';
 import 'policy.dart';
@@ -53,6 +54,7 @@ class Store extends ChangeNotifier {
   String code = ''; // code client affiché sous le QR
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
   bool referredBy = false;
+  int referralPoints = 0; // points Nqata gagnés en parrainant
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
@@ -123,12 +125,16 @@ class Store extends ChangeNotifier {
       final c = await sb.from('profiles').select('client_code').eq('id', uid).maybeSingle();
       code = (c?['client_code'] as String?) ?? '';
     } catch (_) {}
+    try {
+      final rp = await sb.from('profiles').select('referral_points').eq('id', uid).maybeSingle();
+      referralPoints = (rp?['referral_points'] as int?) ?? 0;
+    } catch (_) {}
     favs = (await _q(sb.from('favorites').select('shop_id').eq('client_id', uid))).map((r) => '${r['shop_id']}').toSet();
     ratings = {for (final r in await _q(sb.from('shop_ratings').select('shop_id, avg_rating, reviews_count'))) '${r['shop_id']}': r};
     myRatings = {for (final r in await _q(sb.from('shop_reviews').select('shop_id, rating').eq('client_id', uid))) '${r['shop_id']}': r['rating'] as int};
     txs = await _loadTxs();
     final r = await Future.wait([
-      _q(sb.from('balances').select('points, last_scan_at, shops(id, name, reward_threshold)').eq('client_id', uid)),
+      _q(sb.from('balances').select('points, last_scan_at, expires_at, shops(id, name, reward_threshold)').eq('client_id', uid)),
       _q(sb.from('shops').select('id, name, category, address, hours, lat, lng, reward_threshold, description, logo_url, cover_url, cover_color').eq('status', 'active').order('name')),
       _q(sb.from('offers').select('title, shop_id, shops(name)').order('created_at', ascending: false)),
       _q(sb.from('scans').select('points, created_at, undone_at, shops(name)').eq('client_id', uid).order('created_at', ascending: false).limit(10)),
@@ -170,7 +176,7 @@ class Store extends ChangeNotifier {
   Future<void> _saveCache() async {
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString('cache_$uid', jsonEncode({'name': name, 'code': code, 'wallet': wallet, 'shops': shops, 'offers': offers, 'activity': activity, 'notifs': notifs, 'txs': txs, 'at': DateTime.now().toIso8601String()}));
+      await p.setString('cache_$uid', jsonEncode({'name': name, 'code': code, 'wallet': wallet, 'shops': shops, 'offers': offers, 'activity': activity, 'notifs': notifs, 'txs': txs, 'rp': referralPoints, 'at': DateTime.now().toIso8601String()}));
     } catch (_) {}
   }
 
@@ -183,6 +189,7 @@ class Store extends ChangeNotifier {
       final m = jsonDecode(raw) as Map<String, dynamic>;
       name = m['name'] as String? ?? '';
       code = m['code'] as String? ?? '';
+      referralPoints = m['rp'] as int? ?? 0;
       wallet = _list(m['wallet']); shops = _list(m['shops']); offers = _list(m['offers']); activity = _list(m['activity']); notifs = _list(m['notifs']); txs = _list(m['txs']);
       lastSync = DateTime.tryParse(m['at'] as String? ?? '');
       _checkRewards();
@@ -440,7 +447,7 @@ class Store extends ChangeNotifier {
     try { await sb.auth.signOut(); } catch (_) {}
     await removePin();
     if (_chan != null) { sb.removeChannel(_chan!); _chan = null; }
-    loggedIn = false; name = ''; code = ''; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null; celebrate = null; offline = false; _rewardCount = -1;
+    loggedIn = false; name = ''; code = ''; referralPoints = 0; wallet = []; shops = []; offers = []; activity = []; notifs = []; favs = {}; incoming = null; celebrate = null; offline = false; _rewardCount = -1;
     notifyListeners();
   }
 
@@ -594,6 +601,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     super.initState();
     store.addListener(_onStore);
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) maybeShowTutorial(context); }); // tutoriel : une seule fois
   }
 
   @override
@@ -633,7 +641,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final pages = [HomeScreen(goTo: (i) => setState(() => tab = i)), const MapTab(), const WalletTab(), const DiscoverTab(), const ProfileScreen()];
     return Scaffold(
       body: SafeArea(
-        top: tab != 4, // l'onglet Profil dessine lui-même son en-tête sous la barre d'état
+        top: tab != 4 && tab != 2, // Profil et Portefeuille dessinent eux-mêmes leur en-tête sous la barre d'état
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(a), child: child)),
