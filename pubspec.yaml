@@ -12,7 +12,8 @@ dependencies:
   supabase_flutter: ^2.8.0
   qr_flutter: ^4.1.0
   shared_preferences: ^2.3.2
-  flutter_map: ^7.0.2
+  flutter_map: ^8.2.0
+  flutter_map_vector_tiles: ^2.9.0
   latlong2: ^0.9.1
   url_launcher: ^6.3.0
   geolocator: ^13.0.1
