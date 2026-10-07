@@ -55,7 +55,7 @@ class Store extends ChangeNotifier {
   String code = ''; // code client affiché sous le QR
   List<Map<String, dynamic>> wallet = [], shops = [], offers = [], activity = [], notifs = [];
   bool referredBy = false;
-  int referralPoints = 0; // points Nqata gagnés en parrainant
+  int referralPoints = 0; // points Nqate gagnés en parrainant
   Map<String, dynamic>? incoming; // notification reçue en direct
   RealtimeChannel? _chan;
   Set<String> favs = {}; // commerces favoris
@@ -322,7 +322,7 @@ class Store extends ChangeNotifier {
   Future<bool> _bioPrompt() async {
     try {
       return await _localAuth.authenticate(
-        localizedReason: tr('Déverrouillez votre portefeuille Nqata', 'افتح محفظة نقطة'),
+        localizedReason: tr('Déverrouillez votre portefeuille Nqate', 'افتح محفظة نقطة'),
         options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
       );
     } catch (_) {
@@ -504,7 +504,7 @@ class NqataClient extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) => MaterialApp(
-          title: 'Nqata',
+          title: 'Nqate',
           debugShowCheckedModeBanner: false,
           theme: buildTheme(Brightness.light),
           darkTheme: buildTheme(Brightness.dark),
@@ -611,7 +611,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Image.asset('coin.png', width: 36, height: 36),
                     const SizedBox(width: 10),
-                    const Text('NQATA', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3, color: brandDark)),
+                    const Text('NQATE', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3, color: brandDark)),
                   ]),
                 ),
               ),
@@ -627,7 +627,7 @@ class _LoginPageState extends State<LoginPage> {
                 decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.vertical(top: Radius.elliptical(size.width, 120))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text(
-                    signup ? tr('Rejoignez Nqata', 'انضم إلى نقطة') : tr('Vos points, partout !', 'نقاطك في كل مكان!'),
+                    signup ? tr('Rejoignez Nqate', 'انضم إلى نقطة') : tr('Vos points, partout !', 'نقاطك في كل مكان!'),
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: lang == 'ar' ? 0 : -0.4),
                   ),
