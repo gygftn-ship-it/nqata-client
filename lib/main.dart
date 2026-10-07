@@ -64,6 +64,8 @@ class Store extends ChangeNotifier {
   bool notifsOn = true;
   bool nPoints = true, nRewards = true, nOffers = true;
   int avatarColor = 0;
+  String avatarId = ''; // '' = initiale du nom ; sinon 'a0'…'a11' ou 'robot'
+  int coverTheme = 0; // thème de l'en-tête du profil
   bool bioEnabled = false; // déverrouillage du portefeuille par empreinte
   LatLng? me; // position de l'utilisateur (jamais envoyée au serveur)
   // Code PIN du portefeuille (haché et salé, jamais stocké en clair)
@@ -268,6 +270,8 @@ class Store extends ChangeNotifier {
   void setThemeMode(ThemeMode m) { themeMode = m; _save('theme', m.name); notifyListeners(); }
   void setTextScale(double s) { textScale = s; _save('tscale', s); notifyListeners(); }
   void setAvatarColor(int i) { avatarColor = i; _save('avatar', i); notifyListeners(); }
+  void setAvatarId(String e) { avatarId = e; _save('avatar_id', e); notifyListeners(); }
+  void setCoverTheme(int i) { coverTheme = i; _save('cover', i); notifyListeners(); }
   Future<void> setNotifsOn(bool v) async {
     notifsOn = v;
     await _save('notifs_on', v);
@@ -473,6 +477,8 @@ Future<void> main() async {
   store.nRewards = prefs.getBool('n_rewards') ?? true;
   store.nOffers = prefs.getBool('n_offers') ?? true;
   store.avatarColor = prefs.getInt('avatar') ?? 0;
+  store.avatarId = prefs.getString('avatar_id') ?? '';
+  store.coverTheme = prefs.getInt('cover') ?? 0;
   store.bioEnabled = prefs.getBool('bio') ?? false;
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await Push.init();
