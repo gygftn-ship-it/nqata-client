@@ -4,6 +4,9 @@ import 'nicons.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'style.dart';
+import 'profile.dart' show supportEmail; // adresse du support, définie dans profile.dart
+import 'package:url_launcher/url_launcher.dart';
 
 // ---------- Historique complet : visites et récompenses utilisées ----------
 class HistoryPage extends StatefulWidget {
@@ -92,6 +95,18 @@ class HelpPage extends StatelessWidget {
               expandedCrossAxisAlignment: CrossAxisAlignment.start,
               children: [Text(tr(q.$3, q.$4))],
             ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+            child: Column(children: [
+              Text(tr('Une autre question ?', 'سؤال آخر؟'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => Navigator.push(context, smoothRoute(const SupportChatPage())),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                label: Text(tr('Contacter le support', 'تواصل مع الدعم')),
+              ),
+            ]),
+          ),
         ]),
       );
 }
@@ -169,4 +184,130 @@ class _ConfettiPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ConfettiPainter old) => old.t != t;
+}
+
+// ---------- Support : chat qui envoie un e-mail à l'équipe ----------
+class SupportChatPage extends StatefulWidget {
+  const SupportChatPage({super.key});
+  @override
+  State<SupportChatPage> createState() => _SupportChatPageState();
+}
+
+class _SupportChatPageState extends State<SupportChatPage> {
+  final input = TextEditingController();
+  final scroll = ScrollController();
+  final msgs = <(bool, String)>[]; // (envoyé par le client ?, texte)
+  bool sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    msgs.add((false, tr('Bonjour ! Écrivez votre question ou votre problème : notre équipe vous répondra par e-mail.', 'مرحبًا! اكتب سؤالك أو مشكلتك وسيردّ عليك فريقنا عبر البريد الإلكتروني.')));
+  }
+
+  @override
+  void dispose() {
+    input.dispose();
+    scroll.dispose();
+    super.dispose();
+  }
+
+  void _toEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (scroll.hasClients) scroll.animateTo(scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      });
+
+  Future<void> _send() async {
+    final text = input.text.trim();
+    if (text.isEmpty || sending) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      sending = true;
+      msgs.add((true, text));
+      input.clear();
+    });
+    _toEnd();
+    final body = '$text\n\n—\n${tr('Client', 'الزبون')} : ${store.name}\nCode : ${store.code}\nE-mail : ${store.email}';
+    final uri = Uri.parse('mailto:$supportEmail?subject=${Uri.encodeComponent('Support Nqata')}&body=${Uri.encodeComponent(body)}');
+    var ok = false;
+    try {
+      ok = await launchUrl(uri);
+    } catch (_) {}
+    if (!ok) Clipboard.setData(const ClipboardData(text: supportEmail));
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    setState(() {
+      sending = false;
+      msgs.add((
+        false,
+        ok
+            ? tr('Merci ! Vous recevrez une réponse de notre équipe par e-mail. Si votre application e-mail vient de s\'ouvrir, appuyez sur « Envoyer » pour nous transmettre votre message.',
+                'شكرًا! ستصلك إجابة فريقنا عبر البريد الإلكتروني. إذا فُتح تطبيق البريد، اضغط «إرسال» لإرسال رسالتك.')
+            : tr('Aucune application e-mail trouvée. Écrivez-nous à $supportEmail (adresse copiée) : nous vous répondrons par e-mail.',
+                'لم يتم العثور على تطبيق بريد. راسلنا على $supportEmail (تم نسخ العنوان) وسنردّ عليك عبر البريد.'),
+      ));
+    });
+    _toEnd();
+  }
+
+  Widget _bubble(bool me, String t) => Align(
+        alignment: me ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(color: me ? brandYellow : nTint(context), borderRadius: BorderRadius.circular(18)),
+          child: Text(t, style: TextStyle(fontSize: 15, height: 1.35, color: me ? Colors.black87 : nInk(context))),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(tr('Support', 'الدعم'))),
+        body: SafeArea(
+          child: Column(children: [
+            Expanded(
+              child: ListView.builder(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                itemCount: msgs.length,
+                itemBuilder: (_, i) => _bubble(msgs[i].$1, msgs[i].$2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Expanded(
+                  child: TextField(
+                    controller: input,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: tr('Votre message…', 'رسالتك…'),
+                      filled: true,
+                      fillColor: nTint(context),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  label: tr('Envoyer', 'إرسال'),
+                  child: Material(
+                    color: brandYellow,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _send,
+                      child: const SizedBox(width: 50, height: 50, child: Icon(Icons.send_rounded, color: Colors.black87, size: 22)),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ]),
+        ),
+      );
 }
