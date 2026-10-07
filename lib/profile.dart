@@ -464,8 +464,8 @@ class ProfileScreen extends StatelessWidget {
                           _snack(context, tr('Code copié', 'تم نسخ الرمز'));
                         }),
                         _row(context, 'gift', tr('Parrainage', 'الترشيح'), trailing: _pill(tr('Inviter un ami', 'ادعُ صديقًا')), onTap: () => Navigator.push(context, smoothRoute(const ReferralPage()))),
-                        // Support : désactivé pour l'instant. Pour le réactiver, remplacer par : onTap: () => _contactSupport(context)
-                        _row(context, 'support', tr('Contacter le support', 'اتصل بالدعم'), subtitle: tr('Bientôt disponible', 'قريبًا')),
+                        // Support : ouvre le chat de support (SupportChatPage, dans extras.dart)
+                        _row(context, 'support', tr('Contacter le support', 'اتصل بالدعم'), subtitle: tr('Réponse par e-mail', 'الرد عبر البريد الإلكتروني'), onTap: () => Navigator.push(context, smoothRoute(const SupportChatPage()))),
                       ]),
                     ),
                   ]),
